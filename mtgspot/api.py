@@ -160,7 +160,7 @@ def search_cards(
                 sort="price" if "price" in (sort or "") else None,
                 limit=page_size,
                 offset=offset,
-                only_in_stock=False
+                only_in_stock=(min_stock is not None and min_stock > 0)
             )
             live_items = live_res.get("cards", [])
             if is_foil is not None:
@@ -172,7 +172,7 @@ def search_cards(
                 live_items = [c for c in live_items if c.get("price", 0) >= min_price]
             if max_price is not None:
                 live_items = [c for c in live_items if c.get("price", 0) <= max_price]
-            if min_stock is not None and min_stock > 1:
+            if min_stock is not None and min_stock > 0:
                 live_items = [c for c in live_items if c.get("stock", 0) >= min_stock]
 
             if live_items:
@@ -331,32 +331,44 @@ def bulk_search_cards(req: BulkSearchRequest):
     total_cost = 0.0
 
     for qty, card_name in card_entries:
-        # 1. Search in local database
-        db_items, _ = db.search_cards(title=card_name, min_stock=1, limit=10, sort_by="price_asc")
+        clean_target = card_name.lower().replace("’", "'").replace("`", "'").replace("//", "/").strip()
+        matching_offers = []
 
-        # 2. Check MTG Spot live API if nothing in DB or live_check enabled
-        live_items = []
+        # 1. Check live in-stock store if live_check is enabled (ALWAYS with only_in_stock=True)
         if req.live_check:
             try:
-                live_res = scraper.live_search(name=card_name, limit=10, sort="price", only_in_stock=False)
+                live_res = scraper.live_search(name=card_name, limit=50, sort="price", only_in_stock=True)
                 live_items = live_res.get("cards", [])
+                matching_offers = [
+                    c for c in live_items
+                    if (
+                        clean_target in c.get("title", "").lower().replace("’", "'").replace("//", "/")
+                        or c.get("title", "").lower().replace("’", "'").replace("//", "/") in clean_target
+                    )
+                    and c.get("stock", 0) > 0
+                ]
             except Exception as e:
                 logger.warning(f"Live search fallback failed for {card_name}: {e}")
 
-        all_offers = db_items if db_items else live_items
-
-        matching_offers = [
-            c for c in all_offers
-            if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0
-        ]
+        # 2. If no live matches or live_check disabled, check local database
+        if not matching_offers:
+            db_items, _ = db.search_cards(title=card_name, min_stock=1, limit=50, sort_by="price_asc")
+            matching_offers = [
+                c for c in db_items
+                if (
+                    clean_target in c.get("title", "").lower().replace("’", "'").replace("//", "/")
+                    or c.get("title", "").lower().replace("’", "'").replace("//", "/") in clean_target
+                )
+                and c.get("stock", 0) > 0
+            ]
 
         if matching_offers:
-            matching_offers.sort(key=lambda x: x.get("price", 999999))
+            matching_offers.sort(key=lambda x: (float(x.get("price") or 999999), -int(x.get("stock") or 0)))
             cheapest = matching_offers[0]
             price = float(cheapest.get("price", 0.0))
             subtotal = round(price * qty, 2)
             total_cost += subtotal
-            total_stock_all_offers = sum(c.get("stock", 0) for c in matching_offers)
+            total_stock_all_offers = sum(int(c.get("stock", 0)) for c in matching_offers)
 
             found_cards.append({
                 "requested_name": card_name,
@@ -369,14 +381,19 @@ def bulk_search_cards(req: BulkSearchRequest):
                 "all_offers": matching_offers
             })
         else:
+            # Card is out of stock. Fetch catalog match for display in missing list.
             catalog_match = None
-            catalog_candidates = [
-                c for c in (live_items or db_items)
-                if card_name.lower() in c.get("title", "").lower()
-            ]
-            if catalog_candidates:
-                catalog_candidates.sort(key=lambda x: x.get("price", 999999))
-                catalog_match = catalog_candidates[0]
+            try:
+                cat_res = scraper.live_search(name=card_name, limit=1, sort="price", only_in_stock=False)
+                cat_cards = cat_res.get("cards", [])
+                if cat_cards:
+                    catalog_match = cat_cards[0]
+                else:
+                    db_cat, _ = db.search_cards(title=card_name, min_stock=0, limit=1)
+                    if db_cat:
+                        catalog_match = db_cat[0]
+            except Exception:
+                pass
 
             missing_cards.append({
                 "requested_name": card_name,

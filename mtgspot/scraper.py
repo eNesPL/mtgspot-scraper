@@ -34,6 +34,7 @@ def parse_card_list_text(text: str) -> List[Tuple[int, str]]:
       - 1x Vile Entomber (MH2) 108
       - Gravebreaker Lamia *F*
       - Diabolic Tutor #123
+      - Delver of Secrets // Insectile Aberration
     """
     results = []
     for raw_line in text.strip().splitlines():
@@ -47,10 +48,14 @@ def parse_card_list_text(text: str) -> List[Tuple[int, str]]:
         else:
             qty = 1
             name_part = line
-        # Strip set brackets like (MH2) 123, [MH2], foil asterisks *F*, numbers
-        clean_name = re.sub(r"\s*[\(\[][a-zA-Z0-9_\-]+[\)\]]\s*\S*", "", name_part)
+
+        # Strip set brackets like (MH2) 123, [EMA:43], (STA:10), foil asterisks *F*, numbers
+        clean_name = re.sub(r"\s*[\(\[][a-zA-Z0-9_\-:\s]+[\)\]]\s*[\w\/\-]*", "", name_part)
         clean_name = re.sub(r"\s*\*.*?\*", "", clean_name)
-        clean_name = re.sub(r"\s*#\d+", "", clean_name).strip()
+        clean_name = re.sub(r"\s*#\d+", "", clean_name)
+        clean_name = clean_name.replace("’", "'").replace("`", "'")
+        clean_name = re.sub(r"\s*\/\/\s*", " / ", clean_name)
+        clean_name = re.sub(r"\s+", " ", clean_name).strip()
         if clean_name:
             results.append((qty, clean_name))
     return results

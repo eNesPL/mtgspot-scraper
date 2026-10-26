@@ -182,16 +182,69 @@ class TestMTGSpot(unittest.TestCase):
 
     def test_parse_card_list_text(self):
         from mtgspot.scraper import parse_card_list_text
-        text = """2 Lively Dirge
-        4 Lightning Bolt
-        1x Black Lotus
-        Counterspell"""
+        text = """2 Lively Dirge (MH2) 108
+        4 Lightning Bolt [M11] *F*
+        1x Black Lotus #1
+        Counterspell
+        1 Swords to Plowshares (STA:10)
+        1 Delver of Secrets // Insectile Aberration
+        1 Kaya’s Ghostform"""
         entries = parse_card_list_text(text)
-        self.assertEqual(len(entries), 4)
+        self.assertEqual(len(entries), 7)
         self.assertEqual(entries[0], (2, "Lively Dirge"))
         self.assertEqual(entries[1], (4, "Lightning Bolt"))
         self.assertEqual(entries[2], (1, "Black Lotus"))
         self.assertEqual(entries[3], (1, "Counterspell"))
+        self.assertEqual(entries[4], (1, "Swords to Plowshares"))
+        self.assertEqual(entries[5], (1, "Delver of Secrets / Insectile Aberration"))
+        self.assertEqual(entries[6], (1, "Kaya's Ghostform"))
+
+    def test_bulk_search_in_stock_filtering(self):
+        from unittest.mock import patch, MagicMock
+        from mtgspot.api import bulk_search_cards, BulkSearchRequest
+
+        # Test 5 cards: 4 available, 1 missing
+        mock_data_instock = {
+            "total": 1,
+            "cards": [
+                {"id": "c1", "title": "Counterspell", "stock": 4, "price": 4.50, "condition": "NM"}
+            ]
+        }
+        mock_data_missing = {
+            "total": 0,
+            "cards": []
+        }
+
+        def mock_live_search(name=None, limit=50, sort="price", only_in_stock=True):
+            if only_in_stock:
+                if name == "Vile Entomber":
+                    return mock_data_missing
+                return {
+                    "total": 1,
+                    "cards": [
+                        {"id": f"id_{name}", "title": name, "stock": 2, "price": 5.0, "condition": "NM"}
+                    ]
+                }
+            return {
+                "total": 1,
+                "cards": [
+                    {"id": f"cat_{name}", "title": name, "stock": 0, "price": 4.0, "condition": "NM"}
+                ]
+            }
+
+        with patch("mtgspot.api.scraper.live_search", side_effect=mock_live_search):
+            req = BulkSearchRequest(text="""1 Counterspell
+1 Lightning Bolt
+1 Swords to Plowshares
+1 Dark Ritual
+1 Vile Entomber""")
+            res = bulk_search_cards(req)
+            self.assertEqual(res["summary"]["total_requested"], 5)
+            self.assertEqual(res["summary"]["available_count"], 4)
+            self.assertEqual(res["summary"]["missing_count"], 1)
+            self.assertEqual(len(res["available"]), 4)
+            self.assertEqual(len(res["missing"]), 1)
+            self.assertEqual(res["missing"][0]["requested_name"], "Vile Entomber")
 
 
 if __name__ == "__main__":

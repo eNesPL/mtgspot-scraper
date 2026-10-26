@@ -58,8 +58,11 @@ class WatchService:
             card = self.scraper.parse_card_item(raw_item)
             title = card["title"]
 
-            # Exact or substring match check
-            if card_name.lower() not in title.lower():
+            clean_target = card_name.lower().replace("’", "'").replace("`", "'").replace("//", "/").strip()
+            clean_title = title.lower().replace("’", "'").replace("`", "'").replace("//", "/").strip()
+
+            # Exact or substring match check (bidirectional with normalization)
+            if clean_target not in clean_title and clean_title not in clean_target:
                 continue
 
             # Price constraint
