@@ -1,0 +1,17 @@
+services:
+  mtgspot:
+    build: .
+    image: mtgspot-service:latest
+    container_name: mtgspot-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MTGSPOT_DB_PATH=/data/mtgspot.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - mtgspot-data:/data
+
+volumes:
+  mtgspot-data:
+    driver: local

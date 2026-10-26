@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.db-shm
+*.db-wal
+.git
+.github
+data
+tests
+check_cards.py

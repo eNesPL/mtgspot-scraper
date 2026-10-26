@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTG Spot Explorer & Card Search</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            mtggold: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+            },
+            darkbg: '#0f172a',
+            darkcard: '#1e293b',
+            darkborder: '#334155'
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Phosphor Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body {
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .foil-shimmer {
+      background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,215,0,0.4) 25%, rgba(0,255,255,0.4) 50%, rgba(255,0,255,0.3) 75%, rgba(255,255,255,0.2) 100%);
+      background-size: 200% 200%;
+      animation: shimmer 3s ease infinite;
+    }
+    @keyframes shimmer {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 bg-[#0f172a]/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black text-xl">
+          <i class="fa-solid fa-bolt"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            MTG Spot <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">Explorer</span>
+          </h1>
+          <p class="text-xs text-slate-400">Real-time cards scraper, search & filter engine</p>
+        </div>
+      </div>
+
+      <!-- Quick Metrics & Actions -->
+      <div class="flex items-center gap-3">
+        <div id="stat-cards-badge" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="text-slate-400">Available:</span>
+          <span id="stat-total-available" class="font-semibold text-emerald-400">0</span>
+        </div>
+
+        <a href="/docs" target="_blank" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-code"></i> API Docs
+        </a>
+
+        <button id="btn-discord-modal" onclick="openDiscordModal()" class="text-xs font-medium px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition">
+          <i class="fa-brands fa-discord"></i>
+          <span>Alerty Discord (<span id="stat-watchlist-count">0</span>)</span>
+        </button>
+
+        <button id="btn-sync-modal" onclick="openSyncModal()" class="text-xs font-medium px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition">
+          <i id="sync-icon" class="fa-solid fa-rotate"></i>
+          <span>Sync Scraper</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Scrape In-Progress Notification Banner -->
+  <div id="sync-banner" class="hidden bg-amber-950/80 border-b border-amber-700/50 px-4 py-2 text-xs text-amber-200">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-spinner fa-spin text-amber-400"></i>
+        <span id="sync-banner-text">Scraper syncing in progress...</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-32 bg-amber-900/60 rounded-full h-2 overflow-hidden border border-amber-600/30">
+          <div id="sync-banner-progress" class="bg-amber-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <span id="sync-banner-pct" class="font-mono text-amber-300">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex flex-col lg:flex-row gap-6">
+
+    <!-- Filters Sidebar -->
+    <aside class="w-full lg:w-72 flex-shrink-0">
+      <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 backdrop-blur-sm sticky top-20 shadow-xl space-y-5">
+        
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-filter text-amber-400"></i> Filters
+          </h2>
+          <button onclick="resetFilters()" class="text-xs text-slate-400 hover:text-amber-400 transition flex items-center gap-1">
+            <i class="fa-solid fa-arrow-rotate-left text-[10px]"></i> Reset
+          </button>
+        </div>
+
+        <!-- Expansion / Set Select -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Expansion / Set</label>
+          <div class="relative">
+            <input type="text" id="filter-set-input" placeholder="Search or pick set..." 
+              list="expansions-datalist"
+              oninput="debounceSearch()" 
+              class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
+            <datalist id="expansions-datalist"></datalist>
+          </div>
+        </div>
+
+        <!-- Foil Filter -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Foil Finish</label>
+          <div class="grid grid-cols-3 gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 text-xs">
+            <button type="button" class="foil-btn py-1.5 rounded-lg font-medium text-center transition bg-amber-500 text-slate-950 shadow" data-val="" onclick="setFoilFilter('', this)">All</button>
+            <button type="button" class="foil-btn py-1.5 rounded-lg font-medium text-center transition text-slate-300 hover:text-white" data-val="false" onclick="setFoilFilter('false', this)">Regular</button>
+            <button type="button" class="foil-btn py-1.5 rounded-lg font-medium text-center transition text-slate-300 hover:text-white" data-val="true" onclick="setFoilFilter('true', this)">✨ Foil</button>
+          </div>
+        </div>
+
+        <!-- Card Condition -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Condition</label>
+          <div class="flex flex-wrap gap-1.5" id="condition-badges">
+            <button type="button" onclick="toggleCondition('NM', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-emerald-500 transition">NM</button>
+            <button type="button" onclick="toggleCondition('EX', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-teal-500 transition">EX</button>
+            <button type="button" onclick="toggleCondition('GD', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-blue-500 transition">GD</button>
+            <button type="button" onclick="toggleCondition('LP', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-amber-500 transition">LP</button>
+            <button type="button" onclick="toggleCondition('PL', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-orange-500 transition">PL</button>
+            <button type="button" onclick="toggleCondition('PO', this)" class="cond-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-red-500 transition">PO</button>
+          </div>
+        </div>
+
+        <!-- Rarity Badges -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Rarity</label>
+          <div class="flex flex-wrap gap-1.5" id="rarity-badges">
+            <button type="button" onclick="toggleRarity('Mythic', this)" class="rarity-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-amber-400 hover:border-amber-500 transition">Mythic</button>
+            <button type="button" onclick="toggleRarity('Rare', this)" class="rarity-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-yellow-400 hover:border-yellow-500 transition">Rare</button>
+            <button type="button" onclick="toggleRarity('Uncommon', this)" class="rarity-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:border-cyan-500 transition">Uncommon</button>
+            <button type="button" onclick="toggleRarity('Common', this)" class="rarity-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-500 transition">Common</button>
+            <button type="button" onclick="toggleRarity('Token', this)" class="rarity-btn text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-purple-400 hover:border-purple-500 transition">Token</button>
+          </div>
+        </div>
+
+        <!-- Price Range -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-300 mb-1.5">
+            <span>Price (PLN)</span>
+            <span id="price-range-label" class="text-amber-400 text-[11px]">Any</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="number" id="price-min" placeholder="Min zł" min="0" step="0.5" oninput="debounceSearch()"
+              class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+            <input type="number" id="price-max" placeholder="Max zł" min="0" step="0.5" oninput="debounceSearch()"
+              class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
+          </div>
+        </div>
+
+        <!-- Min Stock -->
+        <div>
+          <div class="flex justify-between items-center text-xs font-semibold text-slate-300 mb-1.5">
+            <span>Min Stock</span>
+            <span id="min-stock-val" class="text-amber-400 text-[11px]">1+</span>
+          </div>
+          <input type="range" id="filter-stock" min="1" max="20" value="1" oninput="updateStockSlider(this.value); debounceSearch()"
+            class="w-full accent-amber-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
+        </div>
+
+        <!-- Export Buttons -->
+        <div class="pt-2 border-t border-slate-800 flex gap-2">
+          <button onclick="exportResults('csv')" class="flex-1 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-file-csv text-emerald-400"></i> CSV
+          </button>
+          <button onclick="exportResults('json')" class="flex-1 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition flex items-center justify-center gap-1.5">
+            <i class="fa-solid fa-code text-cyan-400"></i> JSON
+          </button>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Main Results Area -->
+    <section class="flex-1 min-w-0 space-y-4">
+
+      <!-- Search & Controls Bar -->
+      <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm shadow-xl flex flex-col md:flex-row gap-3 items-center justify-between">
+        
+        <!-- Search Input -->
+        <div class="relative w-full md:max-w-md">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input type="text" id="search-input" placeholder="Search card by name or text (e.g. Lotus, Bolt, Dragon)..." 
+            oninput="debounceSearch()"
+            class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-amber-500 shadow-inner transition">
+          <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Sort & View Controls -->
+        <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400">Sort:</span>
+            <select id="sort-select" onchange="performSearch(1)" class="bg-slate-800 border border-slate-700 text-white rounded-xl px-2.5 py-2 text-xs focus:outline-none focus:border-amber-500">
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="title_asc">Name: A to Z</option>
+              <option value="title_desc">Name: Z to A</option>
+              <option value="stock_desc">Highest Stock</option>
+              <option value="newest">Recently Updated</option>
+            </select>
+          </div>
+
+          <!-- View Mode Toggle -->
+          <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 text-xs">
+            <button id="view-grid-btn" onclick="setViewMode('grid')" class="px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold transition">
+              <i class="fa-solid fa-grip"></i>
+            </button>
+            <button id="view-table-btn" onclick="setViewMode('table')" class="px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+              <i class="fa-solid fa-table-list"></i>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Result Status / Count -->
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <div>
+          Showing <span id="count-range" class="font-semibold text-slate-200">0</span> of <span id="count-total" class="font-semibold text-amber-400">0</span> cards
+        </div>
+        <div id="search-time" class="text-[11px] text-slate-500"></div>
+      </div>
+
+      <!-- Empty State -->
+      <div id="empty-state" class="hidden bg-slate-900/50 border border-dashed border-slate-800 rounded-2xl p-12 text-center">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400 text-2xl mb-3">
+          <i class="fa-solid fa-cards"></i>
+        </div>
+        <h3 class="text-base font-bold text-white mb-1">No cards found</h3>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto mb-4">No cards matched your current search filters. Try adjusting price bounds or clearing keywords.</p>
+        <button onclick="resetFilters()" class="text-xs px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition">
+          Clear All Filters
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loading-state" class="hidden py-16 text-center">
+        <i class="fa-solid fa-spinner fa-spin text-3xl text-amber-500 mb-3"></i>
+        <p class="text-xs text-slate-400">Searching cards database...</p>
+      </div>
+
+      <!-- Grid Results View -->
+      <div id="cards-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Table Results View -->
+      <div id="cards-table-container" class="hidden bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-800/80 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-700">
+              <tr>
+                <th class="px-4 py-3">Card</th>
+                <th class="px-4 py-3">Expansion / Set</th>
+                <th class="px-3 py-3 text-center">Rarity</th>
+                <th class="px-3 py-3 text-center">Cond.</th>
+                <th class="px-3 py-3 text-center">Foil</th>
+                <th class="px-4 py-3 text-center">Stock</th>
+                <th class="px-4 py-3 text-right">Price</th>
+                <th class="px-4 py-3 text-center">Link</th>
+              </tr>
+            </thead>
+            <tbody id="cards-table-body" class="divide-y divide-slate-800/80">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination-container" class="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 backdrop-blur-sm flex items-center justify-between text-xs">
+        <button id="btn-prev-page" onclick="changePage(-1)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
+          <i class="fa-solid fa-chevron-left text-[10px]"></i> Previous
+        </button>
+        <span id="page-display" class="font-medium text-slate-300">Page 1 of 1</span>
+        <button id="btn-next-page" onclick="changePage(1)" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5">
+          Next <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Sync / Scraper Modal -->
+  <div id="sync-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <i class="fa-solid fa-cloud-arrow-down"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">MTG Spot Scraper Sync</h3>
+            <p class="text-xs text-slate-400">Scrape all available in-stock cards</p>
+          </div>
+        </div>
+        <button onclick="closeSyncModal()" class="text-slate-400 hover:text-white text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Batch Size</label>
+          <select id="modal-batch-size" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            <option value="2000" selected>2,000 cards / request (Recommended, ~33 requests)</option>
+            <option value="1000">1,000 cards / request (~67 requests)</option>
+            <option value="5000">5,000 cards / request (~14 requests)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Card Limit (Optional testing)</label>
+          <select id="modal-max-cards" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            <option value="" selected>All available cards (~66,645 in stock)</option>
+            <option value="500">Quick Test (500 cards)</option>
+            <option value="2000">Test Batch (2,000 cards)</option>
+            <option value="10000">Partial Sync (10,000 cards)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="modal-clear-db" class="accent-amber-500 rounded">
+          <label for="modal-clear-db" class="text-slate-300">Clean wipe existing cards before scrape</label>
+        </div>
+
+        <!-- Live Progress Details in Modal -->
+        <div id="modal-progress-box" class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center text-[11px]">
+            <span class="text-slate-400" id="modal-status-text">Status: Ready</span>
+            <span class="font-mono text-amber-400" id="modal-progress-pct">0%</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div id="modal-progress-bar" class="bg-gradient-to-r from-amber-500 to-amber-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <div class="text-[11px] text-slate-400 flex justify-between">
+            <span id="modal-counter">0 / 0 cards</span>
+            <span id="modal-duration">0.0s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeSyncModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+          Close
+        </button>
+        <button id="modal-start-btn" onclick="startScrapeFromModal()" class="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-amber-500/20">
+          Start Sync Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Discord Alerts & Watchlist Modal -->
+  <div id="discord-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-lg">
+            <i class="fa-brands fa-discord"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Powiadomienia Discord – MTG Spot Watcher</h3>
+            <p class="text-xs text-slate-400">Otrzymuj alerty, gdy poszukiwana karta pojawi się w sklepie</p>
+          </div>
+        </div>
+        <button onclick="closeDiscordModal()" class="text-slate-400 hover:text-white text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <div class="flex border-b border-slate-800 gap-2 flex-shrink-0 text-xs">
+        <button id="tab-btn-watchlist" onclick="switchDiscordTab('watchlist')" class="px-3.5 py-2 font-semibold border-b-2 border-indigo-500 text-indigo-400">
+          <i class="fa-solid fa-list-check mr-1"></i> Obserwowane karty
+        </button>
+        <button id="tab-btn-add" onclick="switchDiscordTab('add')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-plus mr-1"></i> Dodaj nową kartę
+        </button>
+        <button id="tab-btn-settings" onclick="switchDiscordTab('settings')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-gear mr-1"></i> Konfiguracja Webhooka
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 text-xs">
+        
+        <!-- Tab 1: Watchlist View -->
+        <div id="tab-content-watchlist" class="space-y-3">
+          <div class="flex justify-between items-center">
+            <span class="text-slate-400 text-[11px]">Karty sprawdzane automatycznie w tle</span>
+            <button onclick="checkWatchlistNow()" id="btn-check-watchlist" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white border border-slate-700 transition flex items-center gap-1.5 text-xs">
+              <i id="check-wl-icon" class="fa-solid fa-arrows-rotate text-[11px]"></i> Sprawdź teraz
+            </button>
+          </div>
+
+          <div id="watchlist-empty" class="hidden text-center py-8 text-slate-500">
+            <i class="fa-solid fa-bell-slash text-2xl mb-2"></i>
+            <p>Nie obserwujesz jeszcze żadnych kart.</p>
+            <button onclick="switchDiscordTab('add')" class="mt-2 text-indigo-400 hover:underline">Dodaj pierwszą kartę</button>
+          </div>
+
+          <div id="watchlist-table-wrap" class="border border-slate-800 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-[11px]">
+              <thead class="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th class="px-3 py-2">Karta</th>
+                  <th class="px-3 py-2 text-center">Limit ceny</th>
+                  <th class="px-2 py-2 text-center">Foil</th>
+                  <th class="px-3 py-2 text-center">Status</th>
+                  <th class="px-2 py-2 text-right">Akcja</th>
+                </tr>
+              </thead>
+              <tbody id="watchlist-tbody" class="divide-y divide-slate-800">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Add New Card Form -->
+        <div id="tab-content-add" class="hidden space-y-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Nazwa karty <span class="text-rose-400">*</span></label>
+            <input type="text" id="add-wl-name" placeholder="np. Vile Entomber, Diabolic Tutor..." 
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-300 font-semibold mb-1">Maksymalna cena (PLN)</label>
+              <input type="number" id="add-wl-price" placeholder="Opcjonalnie np. 15.00" min="0" step="0.5"
+                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-slate-300 font-semibold mb-1">Wykończenie (Foil)</label>
+              <select id="add-wl-foil" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <option value="">Wszystkie (Regular & Foil)</option>
+                <option value="false">Tylko Regular (Zwykłe)</option>
+                <option value="true">Tylko ✨ Foil</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-300 font-semibold mb-1">Minimalny stan</label>
+              <select id="add-wl-cond" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+                <option value="">Dowolny stan</option>
+                <option value="NM">Tylko Near Mint (NM)</option>
+                <option value="NM,EX">Near Mint lub Excellent (NM, EX)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-300 font-semibold mb-1">Konkretny dodatek (opcjonalnie)</label>
+              <input type="text" id="add-wl-expansion" placeholder="np. Modern Horizons 2"
+                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <button onclick="submitAddWatchlist()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
+            <i class="fa-solid fa-plus"></i> Dodaj do obserwowanych
+          </button>
+        </div>
+
+        <!-- Tab 3: Discord Webhook Settings -->
+        <div id="tab-content-settings" class="hidden space-y-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Discord Webhook URL <span class="text-rose-400">*</span></label>
+            <input type="text" id="discord-webhook-url" placeholder="https://discord.com/api/webhooks/..." 
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-[11px] focus:outline-none focus:border-indigo-500">
+            <p class="text-[10px] text-slate-500 mt-1">
+              Wklej webhook z Twojego serwera Discord (Ustawienia kanału -> Integracje -> Webhooki -> Kopiuj adres URL).
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Częstotliwość sprawdzania w tle</label>
+            <select id="discord-check-interval" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+              <option value="120">Co 2 minuty</option>
+              <option value="300" selected>Co 5 minut (Zalecane)</option>
+              <option value="600">Co 10 minut</option>
+              <option value="1800">Co 30 minut</option>
+            </select>
+          </div>
+
+          <div id="webhook-test-alert" class="hidden p-2.5 rounded-xl border text-[11px]"></div>
+
+          <div class="flex gap-2 pt-2">
+            <button onclick="testWebhookFromUI()" id="btn-test-webhook" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test
+            </button>
+            <button onclick="saveWebhookSettingsFromUI()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
+              <i class="fa-solid fa-floppy-disk text-[11px]"></i> Zapisz ustawienia
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-2 border-t border-slate-800 flex justify-end flex-shrink-0">
+        <button onclick="closeDiscordModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+          Zamknij
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let currentPage = 1;
+    let totalPages = 1;
+    let currentView = 'grid';
+    let selectedFoil = '';
+    let selectedConditions = new Set();
+    let selectedRarities = new Set();
+    let searchDebounceTimer = null;
+    let scrapePollTimer = null;
+
+    // Condition color schemes
+    const conditionColors = {
+      'NM': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+      'EX': 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+      'GD': 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+      'LP': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      'PL': 'bg-orange-500/10 text-orange-400 border-orange-500/30',
+      'PO': 'bg-red-500/10 text-red-400 border-red-500/30',
+    };
+
+    // Rarity color schemes
+    const rarityColors = {
+      'mythic': 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border-amber-500/40',
+      'rare': 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+      'uncommon': 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
+      'common': 'bg-slate-700/50 text-slate-300 border-slate-600',
+      'token': 'bg-purple-500/10 text-purple-300 border-purple-500/30'
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadExpansionsList();
+      checkScrapeStatus();
+      loadWatchlist();
+      performSearch(1);
+    });
+
+    async function loadExpansionsList() {
+      try {
+        const res = await fetch('/api/filters');
+        const data = await res.json();
+        const datalist = document.getElementById('expansions-datalist');
+        datalist.innerHTML = '';
+        if (data.expansions) {
+          data.expansions.forEach(exp => {
+            const opt = document.createElement('option');
+            opt.value = exp.expansion_name;
+            opt.textContent = `${exp.expansion_name} (${exp.count} cards)`;
+            datalist.appendChild(opt);
+          });
+        }
+        if (data.stats && data.stats.total_cards) {
+          document.getElementById('stat-total-available').textContent = data.stats.total_cards.toLocaleString();
+        }
+      } catch (err) {
+        console.error('Failed to load filter expansions:', err);
+      }
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        performSearch(1);
+      }, 250);
+    }
+
+    function clearSearch() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      performSearch(1);
+    }
+
+    function updateStockSlider(val) {
+      document.getElementById('min-stock-val').textContent = val + '+';
+    }
+
+    function setFoilFilter(val, btn) {
+      selectedFoil = val;
+      document.querySelectorAll('.foil-btn').forEach(b => {
+        b.className = 'foil-btn py-1.5 rounded-lg font-medium text-center transition text-slate-300 hover:text-white';
+      });
+      btn.className = 'foil-btn py-1.5 rounded-lg font-medium text-center transition bg-amber-500 text-slate-950 shadow';
+      debounceSearch();
+    }
+
+    function toggleCondition(cond, btn) {
+      if (selectedConditions.has(cond)) {
+        selectedConditions.delete(cond);
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      } else {
+        selectedConditions.add(cond);
+        btn.classList.add('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.remove('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      }
+      debounceSearch();
+    }
+
+    function toggleRarity(rarity, btn) {
+      if (selectedRarities.has(rarity)) {
+        selectedRarities.delete(rarity);
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.add('bg-slate-800', 'border-slate-700');
+      } else {
+        selectedRarities.add(rarity);
+        btn.classList.add('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.remove('bg-slate-800', 'border-slate-700');
+      }
+      debounceSearch();
+    }
+
+    function resetFilters() {
+      document.getElementById('search-input').value = '';
+      document.getElementById('filter-set-input').value = '';
+      document.getElementById('price-min').value = '';
+      document.getElementById('price-max').value = '';
+      document.getElementById('filter-stock').value = 1;
+      document.getElementById('min-stock-val').textContent = '1+';
+      document.getElementById('clear-search-btn').classList.add('hidden');
+      
+      selectedConditions.clear();
+      document.querySelectorAll('.cond-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.add('bg-slate-800', 'text-slate-300', 'border-slate-700');
+      });
+
+      selectedRarities.clear();
+      document.querySelectorAll('.rarity-btn').forEach(btn => {
+        btn.classList.remove('bg-amber-500', 'text-slate-950', 'border-amber-500', 'font-bold');
+        btn.classList.add('bg-slate-800', 'border-slate-700');
+      });
+
+      setFoilFilter('', document.querySelector('.foil-btn[data-val=""]'));
+      performSearch(1);
+    }
+
+    function setViewMode(mode) {
+      currentView = mode;
+      const gridBtn = document.getElementById('view-grid-btn');
+      const tableBtn = document.getElementById('view-table-btn');
+      const gridContainer = document.getElementById('cards-grid');
+      const tableContainer = document.getElementById('cards-table-container');
+
+      if (mode === 'grid') {
+        gridBtn.className = 'px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold transition';
+        tableBtn.className = 'px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+        gridContainer.classList.remove('hidden');
+        tableContainer.classList.add('hidden');
+      } else {
+        tableBtn.className = 'px-2.5 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold transition';
+        gridBtn.className = 'px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+        gridContainer.classList.add('hidden');
+        tableContainer.classList.remove('hidden');
+      }
+    }
+
+    function buildQueryParams(page = 1) {
+      const q = document.getElementById('search-input').value.trim();
+      const set = document.getElementById('filter-set-input').value.trim();
+      const minPrice = document.getElementById('price-min').value;
+      const maxPrice = document.getElementById('price-max').value;
+      const minStock = document.getElementById('filter-stock').value;
+      const sort = document.getElementById('sort-select').value;
+
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (set) params.set('expansion', set);
+      if (selectedFoil !== '') params.set('is_foil', selectedFoil);
+      if (selectedConditions.size > 0) params.set('condition', Array.from(selectedConditions).join(','));
+      if (selectedRarities.size > 0) params.set('rarity', Array.from(selectedRarities).join(','));
+      if (minPrice) params.set('min_price', minPrice);
+      if (maxPrice) params.set('max_price', maxPrice);
+      if (minStock) params.set('min_stock', minStock);
+      if (sort) params.set('sort', sort);
+
+      params.set('page', page);
+      params.set('page_size', 24);
+      return params;
+    }
+
+    async function performSearch(page = 1) {
+      currentPage = page;
+      const q = document.getElementById('search-input').value.trim();
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (q) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+
+      const loading = document.getElementById('loading-state');
+      const empty = document.getElementById('empty-state');
+      const grid = document.getElementById('cards-grid');
+      const tableBody = document.getElementById('cards-table-body');
+
+      loading.classList.remove('hidden');
+      empty.classList.add('hidden');
+
+      const params = buildQueryParams(page);
+      const t0 = performance.now();
+
+      try {
+        const res = await fetch(`/api/cards?${params.toString()}`);
+        const data = await res.json();
+        const t1 = performance.now();
+
+        loading.classList.add('hidden');
+        totalPages = data.total_pages || 1;
+
+        // Update counts
+        const startItem = data.total === 0 ? 0 : (page - 1) * data.page_size + 1;
+        const endItem = Math.min(page * data.page_size, data.total);
+        document.getElementById('count-range').textContent = `${startItem}-${endItem}`;
+        document.getElementById('count-total').textContent = data.total.toLocaleString();
+        document.getElementById('search-time').textContent = `Query executed in ${(t1 - t0).toFixed(1)} ms`;
+
+        // Update pagination buttons
+        document.getElementById('page-display').textContent = `Page ${page} of ${totalPages}`;
+        document.getElementById('btn-prev-page').disabled = !data.has_prev;
+        document.getElementById('btn-next-page').disabled = !data.has_next;
+
+        if (data.items.length === 0) {
+          grid.innerHTML = '';
+          tableBody.innerHTML = '';
+          empty.classList.remove('hidden');
+          return;
+        }
+
+        renderGrid(data.items);
+        renderTable(data.items);
+
+      } catch (err) {
+        loading.classList.add('hidden');
+        console.error('Search request failed:', err);
+      }
+    }
+
+    function renderGrid(cards) {
+      const container = document.getElementById('cards-grid');
+      container.innerHTML = cards.map(c => {
+        const condClass = conditionColors[c.condition] || 'bg-slate-800 text-slate-300 border-slate-700';
+        const rarityClass = rarityColors[(c.rarity || '').toLowerCase()] || 'bg-slate-800 text-slate-300 border-slate-700';
+        const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 280' fill='%231e293b'%3E%3Crect width='200' height='280' rx='10'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' fill='%2364748b' font-size='12' font-family='sans-serif'%3ENo Preview%3C/text%3E%3C/svg%3E";
+        const imgUrl = c.image || placeholderImg;
+
+        return `
+          <div class="group bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 relative overflow-hidden">
+            
+            ${c.is_foil ? `<div class="absolute -top-10 -right-10 w-24 h-24 foil-shimmer rounded-full opacity-30 pointer-events-none"></div>` : ''}
+
+            <!-- Card Image -->
+            <div class="relative w-full aspect-[2.5/3.5] rounded-xl overflow-hidden bg-slate-950 border border-slate-800/80 mb-3 flex items-center justify-center">
+              <img src="${imgUrl}" alt="${c.title}" loading="lazy" onerror="this.src='${placeholderImg}'"
+                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+              
+              <!-- Badges on image -->
+              <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                ${c.is_foil ? `<span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-md foil-shimmer text-slate-950 shadow">✨ Foil</span>` : ''}
+              </div>
+
+              <div class="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md border ${condClass} shadow backdrop-blur-sm">
+                  ${c.condition || 'NM'}
+                </span>
+              </div>
+            </div>
+
+            <!-- Card Details -->
+            <div class="space-y-1.5 flex-1 flex flex-col justify-between">
+              <div>
+                <h4 class="font-bold text-sm text-white group-hover:text-amber-400 transition line-clamp-1" title="${c.title}">
+                  ${c.title}
+                </h4>
+                <p class="text-[11px] text-slate-400 line-clamp-1" title="${c.expansion_name || ''}">
+                  ${c.expansion_name || 'Standard'}
+                </p>
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] pt-1">
+                <span class="px-2 py-0.5 rounded border text-[10px] font-medium capitalize ${rarityClass}">
+                  ${c.rarity || 'Common'}
+                </span>
+                <span class="text-slate-400 flex items-center gap-1">
+                  <i class="fa-solid fa-boxes-stacked text-[10px]"></i> <strong class="text-slate-200">${c.stock}</strong> in stock
+                </span>
+              </div>
+
+              <!-- Price & Store Action -->
+              <div class="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <span class="text-[10px] text-slate-500 uppercase font-semibold block">Price</span>
+                  <span class="text-base font-black text-amber-400">${c.price.toFixed(2)} <span class="text-xs text-amber-500 font-bold">zł</span></span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
+                    class="text-xs p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white border border-slate-700 transition">
+                    <i class="fa-solid fa-bell text-[11px]"></i>
+                  </button>
+                  <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
+                    class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 text-slate-300 hover:text-slate-950 font-semibold border border-slate-700 transition flex items-center gap-1 shadow">
+                    Buy <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTable(cards) {
+      const tbody = document.getElementById('cards-table-body');
+      tbody.innerHTML = cards.map(c => {
+        const condClass = conditionColors[c.condition] || 'bg-slate-800 text-slate-300 border-slate-700';
+        const rarityClass = rarityColors[(c.rarity || '').toLowerCase()] || 'bg-slate-800 text-slate-300 border-slate-700';
+        const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 56' fill='%231e293b'%3E%3Crect width='40' height='56' rx='4'/%3E%3C/svg%3E";
+
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-4 py-2.5 flex items-center gap-3">
+              <img src="${c.image || placeholderImg}" class="w-8 h-11 object-cover rounded bg-slate-950 border border-slate-800" onerror="this.src='${placeholderImg}'">
+              <div>
+                <a href="${c.card_url || '#'}" target="_blank" class="font-bold text-white hover:text-amber-400 transition block">
+                  ${c.title}
+                </a>
+                <span class="text-[10px] text-slate-500">${c.language || 'English'}</span>
+              </div>
+            </td>
+            <td class="px-4 py-2.5 text-slate-400">${c.expansion_name || 'Standard'}</td>
+            <td class="px-3 py-2.5 text-center">
+              <span class="px-2 py-0.5 rounded border text-[10px] font-medium capitalize ${rarityClass}">${c.rarity || 'Common'}</span>
+            </td>
+            <td class="px-3 py-2.5 text-center">
+              <span class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${condClass}">${c.condition || 'NM'}</span>
+            </td>
+            <td class="px-3 py-2.5 text-center">
+              ${c.is_foil ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded foil-shimmer text-slate-950">Foil</span>` : `<span class="text-slate-600">-</span>`}
+            </td>
+            <td class="px-4 py-2.5 text-center font-semibold text-slate-200">${c.stock}</td>
+            <td class="px-4 py-2.5 text-right font-black text-amber-400">${c.price.toFixed(2)} zł</td>
+            <td class="px-4 py-2.5 text-center flex items-center justify-center gap-2">
+              <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
+                class="text-slate-400 hover:text-indigo-400 transition">
+                <i class="fa-solid fa-bell text-xs"></i>
+              </button>
+              <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" class="text-slate-400 hover:text-amber-400 transition">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function changePage(delta) {
+      const newPage = currentPage + delta;
+      if (newPage >= 1 && newPage <= totalPages) {
+        performSearch(newPage);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+
+    // Modal & Sync Management
+    function openSyncModal() {
+      document.getElementById('sync-modal').classList.remove('hidden');
+      checkScrapeStatus();
+    }
+
+    function closeSyncModal() {
+      document.getElementById('sync-modal').classList.add('hidden');
+    }
+
+    async function startScrapeFromModal() {
+      const batchSize = parseInt(document.getElementById('modal-batch-size').value, 10);
+      const maxCardsVal = document.getElementById('modal-max-cards').value;
+      const maxCards = maxCardsVal ? parseInt(maxCardsVal, 10) : null;
+      const clearExisting = document.getElementById('modal-clear-db').checked;
+
+      const btn = document.getElementById('modal-start-btn');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Starting...`;
+
+      try {
+        const res = await fetch('/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ batch_size: batchSize, max_cards: maxCards, clear_existing: clearExisting })
+        });
+        const data = await res.json();
+        console.log('Scrape triggered:', data);
+        pollScrapeStatus();
+      } catch (err) {
+        alert('Failed to start scraper: ' + err);
+        btn.disabled = false;
+        btn.textContent = 'Start Sync Now';
+      }
+    }
+
+    function pollScrapeStatus() {
+      if (scrapePollTimer) clearInterval(scrapePollTimer);
+      scrapePollTimer = setInterval(checkScrapeStatus, 1000);
+      checkScrapeStatus();
+    }
+
+    async function checkScrapeStatus() {
+      try {
+        const res = await fetch('/api/scrape/status');
+        const state = await res.json();
+
+        const banner = document.getElementById('sync-banner');
+        const syncIcon = document.getElementById('sync-icon');
+
+        if (state.status === 'running') {
+          banner.classList.remove('hidden');
+          syncIcon.classList.add('fa-spin');
+          document.getElementById('sync-banner-text').textContent = state.message;
+          document.getElementById('sync-banner-progress').style.width = `${state.percent}%`;
+          document.getElementById('sync-banner-pct').textContent = `${state.percent}%`;
+
+          // In modal
+          document.getElementById('modal-status-text').textContent = state.message;
+          document.getElementById('modal-progress-pct').textContent = `${state.percent}%`;
+          document.getElementById('modal-progress-bar').style.width = `${state.percent}%`;
+          document.getElementById('modal-counter').textContent = `${state.current.toLocaleString()} / ${state.total.toLocaleString()} cards`;
+          document.getElementById('modal-duration').textContent = `${state.duration}s`;
+          document.getElementById('modal-start-btn').disabled = true;
+          document.getElementById('modal-start-btn').innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Syncing...`;
+
+          if (!scrapePollTimer) {
+            scrapePollTimer = setInterval(checkScrapeStatus, 1000);
+          }
+        } else {
+          banner.classList.add('hidden');
+          syncIcon.classList.remove('fa-spin');
+          document.getElementById('modal-start-btn').disabled = false;
+          document.getElementById('modal-start-btn').textContent = 'Start Sync Now';
+          document.getElementById('modal-status-text').textContent = state.message;
+          document.getElementById('modal-progress-pct').textContent = `${state.percent}%`;
+          document.getElementById('modal-progress-bar').style.width = `${state.percent}%`;
+
+          if (state.status === 'success' && scrapePollTimer) {
+            clearInterval(scrapePollTimer);
+            scrapePollTimer = null;
+            loadExpansionsList();
+            performSearch(currentPage);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching scrape status:', err);
+      }
+    }
+
+    async function exportResults(format) {
+      const params = buildQueryParams(1);
+      params.set('page_size', 2000); // Fetch up to 2000 items for export
+      try {
+        const res = await fetch(`/api/cards?${params.toString()}`);
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (format === 'json') {
+          const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `mtgspot-cards-${Date.now()}.json`;
+          a.click();
+        } else if (format === 'csv') {
+          if (items.length === 0) return alert('No items to export');
+          const keys = ['id', 'title', 'expansion_name', 'rarity', 'condition', 'is_foil', 'stock', 'price', 'language', 'card_url'];
+          let csv = keys.join(',') + '\n';
+          items.forEach(c => {
+            const row = keys.map(k => {
+              let val = c[k] === null || c[k] === undefined ? '' : String(c[k]);
+              val = val.replace(/"/g, '""');
+              return `"${val}"`;
+            });
+            csv += row.join(',') + '\n';
+          });
+          const blob = new Blob([csv], { type: 'text/csv' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `mtgspot-cards-${Date.now()}.csv`;
+          a.click();
+        }
+      } catch (err) {
+        alert('Export error: ' + err);
+      }
+    }
+
+    // ==================== Discord Alerts & Watchlist UI Logic ====================
+
+    function openDiscordModal() {
+      document.getElementById('discord-modal').classList.remove('hidden');
+      loadWatchlist();
+      loadDiscordSettings();
+    }
+
+    function closeDiscordModal() {
+      document.getElementById('discord-modal').classList.add('hidden');
+    }
+
+    function switchDiscordTab(tab) {
+      const tabs = ['watchlist', 'add', 'settings'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const content = document.getElementById(`tab-content-${t}`);
+        if (t === tab) {
+          btn.className = 'px-3.5 py-2 font-semibold border-b-2 border-indigo-500 text-indigo-400';
+          content.classList.remove('hidden');
+        } else {
+          btn.className = 'px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200';
+          content.classList.add('hidden');
+        }
+      });
+      if (tab === 'watchlist') loadWatchlist();
+      if (tab === 'settings') loadDiscordSettings();
+    }
+
+    async function loadWatchlist() {
+      try {
+        const res = await fetch('/api/watchlist');
+        const items = await res.json();
+        
+        document.getElementById('stat-watchlist-count').textContent = items.length;
+
+        const tbody = document.getElementById('watchlist-tbody');
+        const empty = document.getElementById('watchlist-empty');
+        const tableWrap = document.getElementById('watchlist-table-wrap');
+
+        if (!items || items.length === 0) {
+          empty.classList.remove('hidden');
+          tableWrap.classList.add('hidden');
+          return;
+        }
+
+        empty.classList.add('hidden');
+        tableWrap.classList.remove('hidden');
+
+        tbody.innerHTML = items.map(it => {
+          const isAvailable = (it.last_stock || 0) > 0;
+          const statusBadge = isAvailable
+            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">🟢 Dostępna (${it.last_stock} szt.)</span>`
+            : `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">⚪ Oczekiwanie</span>`;
+
+          const priceStr = it.max_price ? `${it.max_price.toFixed(2)} zł` : '<span class="text-slate-500">Dowolna</span>';
+          const foilStr = it.is_foil === true ? '✨ Foil' : (it.is_foil === false ? 'Regular' : 'Dowolne');
+
+          return `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="px-3 py-2.5">
+                <span class="font-bold text-white block">${it.card_name}</span>
+                ${it.expansion ? `<span class="text-[10px] text-slate-500">${it.expansion}</span>` : ''}
+              </td>
+              <td class="px-3 py-2.5 text-center font-mono">${priceStr}</td>
+              <td class="px-2 py-2.5 text-center text-[10px] text-slate-400">${foilStr}</td>
+              <td class="px-3 py-2.5 text-center text-[10px]">${statusBadge}</td>
+              <td class="px-2 py-2.5 text-right">
+                <button onclick="deleteWatchlistCard(${it.id})" class="text-rose-400 hover:text-rose-300 p-1 transition" title="Usuń z obserwowanych">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error('Błąd ładowania listy obserwowanych:', err);
+      }
+    }
+
+    async function loadDiscordSettings() {
+      try {
+        const res = await fetch('/api/settings/discord');
+        const data = await res.json();
+        if (data.webhook_url) {
+          document.getElementById('discord-webhook-url').value = data.webhook_url;
+        }
+        if (data.interval_seconds) {
+          document.getElementById('discord-check-interval').value = data.interval_seconds;
+        }
+      } catch (err) {
+        console.error('Błąd pobierania ustawień Discord:', err);
+      }
+    }
+
+    async function saveWebhookSettingsFromUI() {
+      const url = document.getElementById('discord-webhook-url').value.trim();
+      const interval = parseInt(document.getElementById('discord-check-interval').value, 10);
+      const alertBox = document.getElementById('webhook-test-alert');
+
+      if (!url) {
+        alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
+        alertBox.textContent = 'Proszę podać adres Discord Webhook URL.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/settings/discord', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ webhook_url: url, interval_seconds: interval })
+        });
+        const data = await res.json();
+        alertBox.className = 'p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[11px]';
+        alertBox.textContent = '✅ ' + data.message;
+        alertBox.classList.remove('hidden');
+      } catch (err) {
+        alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
+        alertBox.textContent = 'Błąd zapisu: ' + err;
+        alertBox.classList.remove('hidden');
+      }
+    }
+
+    async function testWebhookFromUI() {
+      const url = document.getElementById('discord-webhook-url').value.trim();
+      const alertBox = document.getElementById('webhook-test-alert');
+      const btn = document.getElementById('btn-test-webhook');
+
+      if (!url) {
+        alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
+        alertBox.textContent = 'Wklej webhook URL, aby móc go przetestować.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Wysyłanie...`;
+
+      try {
+        const res = await fetch('/api/discord/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ webhook_url: url })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test`;
+
+        if (res.ok) {
+          alertBox.className = 'p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[11px]';
+          alertBox.textContent = '✅ ' + data.message + ' Sprawdź swój kanał na Discordzie!';
+          alertBox.classList.remove('hidden');
+        } else {
+          alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
+          alertBox.textContent = '❌ Błąd: ' + (data.detail || 'Nie udało się wysłać');
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test`;
+        alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
+        alertBox.textContent = 'Błąd połączenia: ' + err;
+        alertBox.classList.remove('hidden');
+      }
+    }
+
+    async function submitAddWatchlist() {
+      const name = document.getElementById('add-wl-name').value.trim();
+      const priceVal = document.getElementById('add-wl-price').value;
+      const maxPrice = priceVal ? parseFloat(priceVal) : null;
+      const foilVal = document.getElementById('add-wl-foil').value;
+      const isFoil = foilVal === '' ? null : (foilVal === 'true');
+      const condition = document.getElementById('add-wl-cond').value || null;
+      const expansion = document.getElementById('add-wl-expansion').value.trim() || null;
+
+      if (!name) {
+        alert('Podaj nazwę karty!');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            card_name: name,
+            max_price: maxPrice,
+            is_foil: isFoil,
+            condition: condition,
+            expansion: expansion
+          })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById('add-wl-name').value = '';
+          document.getElementById('add-wl-price').value = '';
+          switchDiscordTab('watchlist');
+        } else {
+          alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+        }
+      } catch (err) {
+        alert('Błąd sieci: ' + err);
+      }
+    }
+
+    function quickWatchCard(cardTitle, currentPrice) {
+      openDiscordModal();
+      switchDiscordTab('add');
+      document.getElementById('add-wl-name').value = cardTitle;
+      if (currentPrice) {
+        // Suggest slightly higher threshold or current price
+        document.getElementById('add-wl-price').value = (currentPrice * 1.2).toFixed(2);
+      }
+    }
+
+    async function deleteWatchlistCard(id) {
+      if (!confirm('Czy na pewno chcesz usunąć tę kartę z obserwowanych?')) return;
+      try {
+        await fetch(`/api/watchlist/${id}`, { method: 'DELETE' });
+        loadWatchlist();
+      } catch (err) {
+        alert('Błąd usuwania: ' + err);
+      }
+    }
+
+    async function checkWatchlistNow() {
+      const btn = document.getElementById('btn-check-watchlist');
+      const icon = document.getElementById('check-wl-icon');
+      btn.disabled = true;
+      icon.classList.add('fa-spin');
+
+      try {
+        const res = await fetch('/api/watchlist/check', { method: 'POST' });
+        const data = await res.json();
+        icon.classList.remove('fa-spin');
+        btn.disabled = false;
+        loadWatchlist();
+        alert(`Sprawdzono ${data.checked_count} kart. Wysłano ${data.alerts_sent} powiadomień Discord!`);
+      } catch (err) {
+        icon.classList.remove('fa-spin');
+        btn.disabled = false;
+        alert('Błąd sprawdzania: ' + err);
+      }
+    }
+  </script>
+</body>
+</html>
