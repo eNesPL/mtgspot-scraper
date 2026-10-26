@@ -150,6 +150,65 @@ class TestWatchlistAndDiscord(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("Nieprawidłowy adres", msg)
 
+    def test_has_card_been_notified(self):
+        self.assertFalse(self.db.has_card_been_notified("Vile Entomber"))
+        self.db.record_notification(1, "card_1", "Vile Entomber (Modern Horizons 2)", 3.50, 2)
+        self.assertTrue(self.db.has_card_been_notified("Vile Entomber"))
+        self.assertTrue(self.db.has_card_been_notified("vile entomber"))
+        self.assertFalse(self.db.has_card_been_notified("Sol Ring"))
+
+    def test_watcher_single_alert_and_restock_deduplication(self):
+        from unittest.mock import MagicMock, patch
+        from mtgspot.watcher import WatchService
+        from mtgspot.scraper import MTGSpotScraper
+
+        scraper = MTGSpotScraper(db=self.db)
+        watcher = WatchService(self.db, scraper)
+
+        item_id = self.db.add_watchlist_item("Vile Entomber", max_price=10.0, webhook_url="https://discord.com/api/webhooks/123/mock")
+        item = self.db.get_watchlist_item(item_id)
+
+        # Mock MTG Spot returning 3 offers for the same card
+        fake_api_response = {
+            "response": {
+                "data": [
+                    {"id": "o1", "attributes": {"title": "Vile Entomber", "price": "5.00", "stock": 1}},
+                    {"id": "o2", "attributes": {"title": "Vile Entomber", "price": "3.50", "stock": 1}},
+                    {"id": "o3", "attributes": {"title": "Vile Entomber", "price": "4.00", "stock": 1}},
+                ]
+            }
+        }
+
+        with patch.object(scraper.session, "get") as mock_get, \
+             patch("mtgspot.watcher.send_discord_card_alert") as mock_alert:
+            
+            mock_resp = MagicMock()
+            mock_resp.status_code = 200
+            mock_resp.json.return_value = fake_api_response
+            mock_resp.raise_for_status.return_value = None
+            mock_get.return_value = mock_resp
+            mock_alert.return_value = (True, "Powiadomienie wysłane")
+
+            # First run: 3 matching offers, but should send ONLY 1 consolidated alert for best price (3.50)
+            res1 = watcher.check_watchlist_item(item)
+            self.assertEqual(res1["in_stock_count"], 3)
+            self.assertEqual(res1["matching_offers"], 3)
+            self.assertEqual(res1["alerts_sent"], 1)
+            self.assertEqual(mock_alert.call_count, 1)
+
+            # Check that best offer (cheapest price: 3.50) was passed
+            call_args = mock_alert.call_args[0]
+            best_card_arg = call_args[1]
+            self.assertEqual(best_card_arg["price"], 3.50)
+
+            # Second run: card still in stock -> should send 0 alerts (quiet while in stock)
+            item_updated = self.db.get_watchlist_item(item_id)
+            res2 = watcher.check_watchlist_item(item_updated)
+            self.assertEqual(res2["in_stock_count"], 3)
+            self.assertEqual(res2["alerts_sent"], 0)
+            # mock_alert count should still be 1 (no new call)
+            self.assertEqual(mock_alert.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

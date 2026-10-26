@@ -22,11 +22,14 @@ class WatchService:
     def check_watchlist_item(
         self,
         item: Dict[str, Any],
-        default_webhook: Optional[str] = None
+        default_webhook: Optional[str] = None,
+        force_notify: bool = False
     ) -> Dict[str, Any]:
         """
         Check MTG Spot live store for a single watchlist item.
-        If in-stock cards match the criteria, send Discord alert.
+        If in-stock cards match the criteria, send consolidated Discord alert.
+        Alert is only sent on restock events (stock went from 0 to >0, or card was never notified),
+        preventing continuous repeat spam for cards that remain in stock.
         """
         watchlist_id = item["id"]
         card_name = item["card_name"]
@@ -35,6 +38,8 @@ class WatchService:
         req_foil = item.get("is_foil")
         req_expansion = item.get("expansion")
         webhook = item.get("webhook_url") or item.get("list_webhook_url") or default_webhook
+        prev_stock = int(item.get("last_stock") or 0)
+        last_notified_at = item.get("last_notified_at")
 
         # Query MTG Spot API for in-stock cards with this name
         url = f"https://gateway.mtgspot.pl/api/shop/articles?page[limit]=50&filter[is_in_channel]=1&filter[name]={urllib.parse.quote(card_name)}"
@@ -84,21 +89,44 @@ class WatchService:
             total_in_stock += card["stock"]
 
         alerts_sent = 0
-        if matching_cards and webhook:
-            for card in matching_cards:
-                # Deduplicate: check if this exact card offer was already notified in the last 24h
-                if not self.db.has_been_notified(watchlist_id, card["id"], card["price"]):
-                    success, msg = send_discord_card_alert(webhook, card, item)
-                    if success:
-                        self.db.record_notification(
-                            watchlist_id,
-                            card["id"],
-                            card["title"],
-                            card["price"],
-                            card["stock"]
-                        )
-                        alerts_sent += 1
 
+        # Sort matching cards by price ascending so the best offer is first
+        matching_cards.sort(key=lambda c: (c.get("price", float("inf")), -c.get("stock", 0)))
+
+        if matching_cards and webhook:
+            best_offer = matching_cards[0]
+
+            # Restock event logic:
+            # Send alert only if:
+            # 1. Card was previously out of stock (prev_stock == 0)
+            # 2. Or card was newly added and never alerted yet (last_notified_at is None)
+            # 3. Or forced explicitly
+            # If the card was ALREADY in stock and notified, do NOT send repeat alerts!
+            is_restock_event = (prev_stock == 0) or (last_notified_at is None) or force_notify
+
+            # Anti-spam check: prevent re-sending if notified very recently (e.g. across lists or rapid clicks)
+            already_notified = self.db.has_card_been_notified(card_name, hours=6)
+
+            if is_restock_event and (not already_notified or force_notify):
+                success, msg = send_discord_card_alert(
+                    webhook,
+                    best_offer,
+                    rule=item,
+                    total_stock=total_in_stock,
+                    matching_offers_count=len(matching_cards)
+                )
+                if success:
+                    self.db.record_notification(
+                        watchlist_id,
+                        best_offer["id"],
+                        card_name,
+                        best_offer["price"],
+                        total_in_stock
+                    )
+                    alerts_sent = 1
+
+        # Update stock count in database
+        # If alerts_sent > 0, notified=True updates last_notified_at
         self.db.update_watchlist_stock(watchlist_id, total_in_stock, notified=(alerts_sent > 0))
 
         return {

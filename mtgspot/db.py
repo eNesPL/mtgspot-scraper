@@ -912,6 +912,25 @@ class Database:
                 cursor.execute("UPDATE watchlist SET last_stock = ? WHERE id = ?;", (last_stock, item_id))
             conn.commit()
 
+    def has_card_been_notified(self, card_name: str, hours: int = 6) -> bool:
+        """
+        Check if an alert for this card name was already sent recently
+        (within the last `hours` hours) to prevent repeated spam.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id FROM notification_history
+                WHERE (
+                    LOWER(TRIM(card_title)) = LOWER(TRIM(?))
+                    OR INSTR(LOWER(card_title), LOWER(TRIM(?))) > 0
+                    OR INSTR(LOWER(TRIM(?)), LOWER(card_title)) > 0
+                )
+                  AND sent_at >= datetime('now', ? || ' hours')
+                LIMIT 1;
+            """, (card_name, card_name, card_name, f"-{hours}"))
+            return cursor.fetchone() is not None
+
     def has_been_notified(self, watchlist_id: int, card_id: str, price: float) -> bool:
         """
         Check if we already notified for this exact card offer at this price

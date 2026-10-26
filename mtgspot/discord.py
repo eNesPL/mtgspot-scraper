@@ -45,10 +45,13 @@ def send_test_webhook(webhook_url: str) -> Tuple[bool, str]:
 def send_discord_card_alert(
     webhook_url: str,
     card: Dict[str, Any],
-    rule: Optional[Dict[str, Any]] = None
+    rule: Optional[Dict[str, Any]] = None,
+    total_stock: Optional[int] = None,
+    matching_offers_count: Optional[int] = None
 ) -> Tuple[bool, str]:
     """
     Send a rich Discord Embed when a watched card is in-stock on MTG Spot.
+    Consolidates multiple offers into a single notification.
     """
     if not webhook_url:
         return False, "Brak skonfigurowanego Webhook URL"
@@ -56,6 +59,7 @@ def send_discord_card_alert(
     title = card.get("title", "Karta MTG")
     price = float(card.get("price", 0.0))
     stock = int(card.get("stock", 0))
+    display_stock = total_stock if total_stock is not None else stock
     expansion = card.get("expansion_name", "Nieznany dodatek")
     condition = card.get("condition", "NM")
     is_foil = card.get("is_foil", False)
@@ -72,15 +76,24 @@ def send_discord_card_alert(
         if max_p is not None:
             rule_note = f" *(Limit ceny: do {max_p:.2f} zł)*"
 
+    price_label = "💰 Cena" if not matching_offers_count or matching_offers_count <= 1 else "💰 Najlepsza cena"
+    stock_value = f"**{display_stock} szt.**"
+    if matching_offers_count and matching_offers_count > 1:
+        stock_value = f"**{display_stock} szt.** ({matching_offers_count} ofert od {price:.2f} zł)"
+
+    desc = f"Właśnie pojawiła się na stanie w **MTG Spot** w cenie **{price:.2f} zł**!{rule_note}"
+    if matching_offers_count and matching_offers_count > 1:
+        desc = f"Właśnie pojawiła się na stanie w **MTG Spot** w cenie od **{price:.2f} zł** ({matching_offers_count} dostępnych ofert, łącznie {display_stock} szt.)!{rule_note}"
+
     fields = [
         {
-            "name": "💰 Cena",
+            "name": price_label,
             "value": f"**{price:.2f} zł**",
             "inline": True
         },
         {
             "name": "📦 W magazynie",
-            "value": f"**{stock} szt.**",
+            "value": stock_value,
             "inline": True
         },
         {
@@ -115,7 +128,7 @@ def send_discord_card_alert(
     embed = {
         "title": f"🎯 Poszukiwana karta dostępna: {title}!",
         "url": card_url,
-        "description": f"Właśnie pojawiła się na stanie w **MTG Spot** w cenie **{price:.2f} zł**!{rule_note}",
+        "description": desc,
         "color": color,
         "thumbnail": {
             "url": image_url
