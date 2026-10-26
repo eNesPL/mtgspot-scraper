@@ -76,9 +76,9 @@
 
       <!-- Quick Metrics & Actions -->
       <div class="flex items-center gap-3">
-        <div id="stat-cards-badge" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60 text-xs">
+        <div id="stat-cards-badge" onclick="openDiscordModal()" class="cursor-pointer hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 text-xs transition" title="Kliknij, aby otworzyć obserwowane karty">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-slate-400">Available:</span>
+          <span id="stat-available-label" class="text-slate-400">Available:</span>
           <span id="stat-total-available" class="font-semibold text-emerald-400">0</span>
         </div>
 
@@ -836,12 +836,33 @@
       'token': 'bg-purple-500/10 text-purple-300 border-purple-500/30'
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       loadExpansionsList();
       checkScrapeStatus();
-      loadWatchlist();
+      await loadWishlists();
+      await loadWatchlist();
       performSearch(1);
     });
+
+    function updateAvailableBadge(inStock, total) {
+      const availEl = document.getElementById('stat-total-available');
+      const labelEl = document.getElementById('stat-available-label');
+      const badgeEl = document.getElementById('stat-cards-badge');
+      if (!availEl) return;
+
+      const numTotal = parseInt(total, 10) || 0;
+      const numInStock = parseInt(inStock, 10) || 0;
+
+      if (numTotal > 0) {
+        availEl.textContent = `${numInStock} / ${numTotal}`;
+        availEl.className = numInStock > 0 ? 'font-semibold text-emerald-400' : 'font-semibold text-slate-400';
+        if (badgeEl) badgeEl.title = `${numInStock} z ${numTotal} obserwowanych kart jest obecnie na stanie w MTG Spot (kliknij, aby otworzyć alerty)`;
+      } else {
+        availEl.textContent = '0';
+        availEl.className = 'font-semibold text-slate-400';
+        if (badgeEl) badgeEl.title = 'Brak obserwowanych kart w alertach';
+      }
+    }
 
     async function loadExpansionsList() {
       try {
@@ -856,9 +877,6 @@
             opt.textContent = `${exp.expansion_name} (${exp.count} cards)`;
             datalist.appendChild(opt);
           });
-        }
-        if (data.stats && data.stats.total_cards) {
-          document.getElementById('stat-total-available').textContent = data.stats.total_cards.toLocaleString();
         }
       } catch (err) {
         console.error('Failed to load filter expansions:', err);
@@ -1359,6 +1377,10 @@
         // 1. Render pills
         const pillsWrap = document.getElementById('wishlist-pills');
         const totalCards = wishlistsData.reduce((acc, w) => acc + (w.card_count || 0), 0);
+        const totalInStock = wishlistsData.reduce((acc, w) => acc + (w.in_stock_count || 0), 0);
+
+        // Update top bar available badge
+        updateAvailableBadge(totalInStock, totalCards);
 
         const allPill = `
           <button onclick="selectWishlist(null)" class="px-3 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${currentWishlistId === null ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
@@ -1408,14 +1430,14 @@
 
         if (currentWishlistId === null) {
           if (titleEl) titleEl.textContent = 'Wszystkie listy i talie';
-          if (statsEl) statsEl.textContent = `(${totalCards} kart)`;
+          if (statsEl) statsEl.textContent = `(${totalCards} kart${totalInStock > 0 ? `, 🟢 ${totalInStock} w sklepie` : ''})`;
           if (manageBtns) manageBtns.classList.add('hidden');
           if (checkBtnLabel) checkBtnLabel.textContent = 'Sprawdź wszystkie';
         } else {
           const cur = wishlistsData.find(w => w.id === currentWishlistId);
           if (cur) {
             if (titleEl) titleEl.textContent = cur.name;
-            if (statsEl) statsEl.textContent = `(${cur.card_count || 0} kart${cur.in_stock_count ? `, 🟢 ${cur.in_stock_count} w sklepie` : ''})`;
+            if (statsEl) statsEl.textContent = `(${cur.card_count || 0} kart${(cur.in_stock_count || 0) > 0 ? `, 🟢 ${cur.in_stock_count} w sklepie` : ''})`;
             if (manageBtns) manageBtns.classList.remove('hidden');
             if (checkBtnLabel) checkBtnLabel.textContent = `Sprawdź tę listę`;
             const delBtn = document.getElementById('btn-del-wishlist');
@@ -1518,9 +1540,17 @@
         const items = await res.json();
         watchlistCards = items;
         
-        const totalCards = wishlistsData.reduce((acc, w) => acc + (w.card_count || 0), 0);
+        const totalCards = wishlistsData.length > 0 
+          ? wishlistsData.reduce((acc, w) => acc + (w.card_count || 0), 0)
+          : (items ? items.length : 0);
+        const totalInStock = wishlistsData.length > 0
+          ? wishlistsData.reduce((acc, w) => acc + (w.in_stock_count || 0), 0)
+          : (items ? items.filter(it => (it.last_stock || 0) > 0).length : 0);
+
         const statCountEl = document.getElementById('stat-watchlist-count');
         if (statCountEl) statCountEl.textContent = totalCards;
+
+        updateAvailableBadge(totalInStock, totalCards);
 
         const tbody = document.getElementById('watchlist-tbody');
         const empty = document.getElementById('watchlist-empty');
