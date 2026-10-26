@@ -301,15 +301,17 @@ class MTGSpotScraper:
         id_expansion: Optional[int] = None,
         sort: Optional[str] = "price",
         limit: int = 20,
-        offset: int = 0
+        offset: int = 0,
+        only_in_stock: bool = False
     ) -> Dict[str, Any]:
         """Live pass-through search directly against MTG Spot API."""
         url = f"{GATEWAY_API_URL}/api/shop/articles"
         params: Dict[str, Any] = {
             "page[limit]": limit,
-            "page[offset]": offset,
-            "filter[is_in_channel]": 1
+            "page[offset]": offset
         }
+        if only_in_stock:
+            params["filter[is_in_channel]"] = 1
         if name:
             params["filter[name]"] = name
         if is_foil is not None:

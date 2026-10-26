@@ -180,6 +180,19 @@ class TestMTGSpot(unittest.TestCase):
         self.assertEqual(parsed["is_foil"], False)
         self.assertIn("mtgspot.pl/single/stronghold/20/mox-diamond/8888/9999", parsed["card_url"])
 
+    def test_parse_card_list_text(self):
+        from mtgspot.scraper import parse_card_list_text
+        text = """2 Lively Dirge
+        4 Lightning Bolt
+        1x Black Lotus
+        Counterspell"""
+        entries = parse_card_list_text(text)
+        self.assertEqual(len(entries), 4)
+        self.assertEqual(entries[0], (2, "Lively Dirge"))
+        self.assertEqual(entries[1], (4, "Lightning Bolt"))
+        self.assertEqual(entries[2], (1, "Black Lotus"))
+        self.assertEqual(entries[3], (1, "Counterspell"))
+
 
 if __name__ == "__main__":
     unittest.main()

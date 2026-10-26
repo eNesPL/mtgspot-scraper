@@ -198,7 +198,7 @@
             <span>Min Stock</span>
             <span id="min-stock-val" class="text-amber-400 text-[11px]">1+</span>
           </div>
-          <input type="range" id="filter-stock" min="1" max="20" value="1" oninput="updateStockSlider(this.value); debounceSearch()"
+          <input type="range" id="filter-stock" min="0" max="20" value="1" oninput="updateStockSlider(this.value); debounceSearch()"
             class="w-full accent-amber-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer">
         </div>
 
@@ -777,7 +777,7 @@
     }
 
     function updateStockSlider(val) {
-      document.getElementById('min-stock-val').textContent = val + '+';
+      document.getElementById('min-stock-val').textContent = (val == 0) ? '0+ (Wszystkie)' : val + '+';
     }
 
     function setFoilFilter(val, btn) {
@@ -983,26 +983,40 @@
                 <span class="px-2 py-0.5 rounded border text-[10px] font-medium capitalize ${rarityClass}">
                   ${c.rarity || 'Common'}
                 </span>
-                <span class="text-slate-400 flex items-center gap-1">
-                  <i class="fa-solid fa-boxes-stacked text-[10px]"></i> <strong class="text-slate-200">${c.stock}</strong> in stock
-                </span>
+                ${c.stock > 0 ? `
+                  <span class="text-slate-400 flex items-center gap-1">
+                    <i class="fa-solid fa-boxes-stacked text-[10px]"></i> <strong class="text-emerald-400 font-bold">${c.stock}</strong> w sklepie
+                  </span>
+                ` : `
+                  <span class="text-rose-400 font-semibold text-[10px] bg-rose-500/15 px-2 py-0.5 rounded border border-rose-500/30">
+                    Wyprzedana (0 szt.)
+                  </span>
+                `}
               </div>
 
               <!-- Price & Store Action -->
               <div class="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between">
                 <div>
-                  <span class="text-[10px] text-slate-500 uppercase font-semibold block">Price</span>
-                  <span class="text-base font-black text-amber-400">${c.price.toFixed(2)} <span class="text-xs text-amber-500 font-bold">zł</span></span>
+                  <span class="text-[10px] text-slate-500 uppercase font-semibold block">${c.stock > 0 ? 'Price' : 'Cena kat.'}</span>
+                  <span class="text-base font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} <span class="text-xs font-bold ${c.stock > 0 ? 'text-amber-500' : 'text-slate-500'}">zł</span></span>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
-                    class="text-xs p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white border border-slate-700 transition">
+                    class="text-xs px-2 py-1.5 rounded-lg ${c.stock <= 0 ? 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold' : 'bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white'} border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer">
                     <i class="fa-solid fa-bell text-[11px]"></i>
+                    ${c.stock <= 0 ? '<span class="text-[10px]">Alert</span>' : ''}
                   </button>
-                  <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
-                    class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-amber-500 text-slate-300 hover:text-slate-950 font-semibold border border-slate-700 transition flex items-center gap-1 shadow">
-                    Buy <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
-                  </a>
+                  ${c.stock > 0 ? `
+                    <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
+                      class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1 shadow">
+                      Kup <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                    </a>
+                  ` : `
+                    <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
+                      class="text-xs px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium border border-slate-700 transition flex items-center gap-1">
+                      Katalog <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                    </a>
+                  `}
                 </div>
               </div>
             </div>
@@ -1040,11 +1054,13 @@
             <td class="px-3 py-2.5 text-center">
               ${c.is_foil ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded foil-shimmer text-slate-950">Foil</span>` : `<span class="text-slate-600">-</span>`}
             </td>
-            <td class="px-4 py-2.5 text-center font-semibold text-slate-200">${c.stock}</td>
-            <td class="px-4 py-2.5 text-right font-black text-amber-400">${c.price.toFixed(2)} zł</td>
+            <td class="px-4 py-2.5 text-center font-semibold">
+              ${c.stock > 0 ? `<span class="text-emerald-400">${c.stock} szt.</span>` : `<span class="text-rose-400 text-xs font-semibold">Wyprzedana</span>`}
+            </td>
+            <td class="px-4 py-2.5 text-right font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} zł</td>
             <td class="px-4 py-2.5 text-center flex items-center justify-center gap-2">
               <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
-                class="text-slate-400 hover:text-indigo-400 transition">
+                class="text-slate-400 hover:text-indigo-400 transition cursor-pointer">
                 <i class="fa-solid fa-bell text-xs"></i>
               </button>
               <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" class="text-slate-400 hover:text-amber-400 transition">
@@ -1531,14 +1547,16 @@
       // Missing Action Bar
       lastBulkMissingCards = data.missing.map(m => m.requested_name);
       const missingBar = document.getElementById('bulk-missing-action');
-      const missingBtnCount = document.getElementById('missing-count-btn');
+      const addMissingBtn = document.getElementById('btn-add-missing-wl');
       if (lastBulkMissingCards.length > 0) {
-        missingBar.classList.remove('hidden');
-        missingBtnCount.textContent = lastBulkMissingCards.length;
-        document.getElementById('btn-add-missing-wl').disabled = false;
-        document.getElementById('btn-add-missing-wl').innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące (${lastBulkMissingCards.length})`;
+        if (missingBar) missingBar.classList.remove('hidden');
+        if (addMissingBtn) {
+          addMissingBtn.disabled = false;
+          addMissingBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow cursor-pointer';
+          addMissingBtn.innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące (${lastBulkMissingCards.length})`;
+        }
       } else {
-        missingBar.classList.add('hidden');
+        if (missingBar) missingBar.classList.add('hidden');
       }
 
       // Available Table
@@ -1592,11 +1610,25 @@
       } else {
         missingWrap.classList.remove('hidden');
         missingList.innerHTML = data.missing.map(m => {
+          const cat = m.catalog_offer;
+          const infoText = cat ? `${cat.expansion_name || ''}${cat.price ? ' · kat. ~' + Number(cat.price).toFixed(2) + ' zł' : ''}` : '';
           return `
-            <span class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700/80 text-slate-300 flex items-center gap-1.5 text-xs">
-              <span class="text-rose-400 font-bold">✕</span>
-              <span>${m.quantity > 1 ? `${m.quantity}x ` : ''}${m.requested_name}</span>
-            </span>
+            <div class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-300 flex items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="text-rose-400 font-bold text-sm">✕</span>
+                <div>
+                  <span class="font-bold text-white">${m.quantity > 1 ? `${m.quantity}x ` : ''}${m.requested_name}</span>
+                  ${infoText ? `<span class="text-[10px] text-slate-400 block">${infoText}</span>` : ''}
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold whitespace-nowrap">Wyprzedana (0 szt.)</span>
+                <button onclick="quickWatchCard('${m.requested_name.replace(/'/g, "\\'")}', ${cat && cat.price ? cat.price : 0})" title="Dodaj tę kartę do obserwowanych"
+                  class="text-[11px] px-2 py-1 rounded bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white transition flex items-center gap-1 cursor-pointer">
+                  <i class="fa-solid fa-bell text-[10px]"></i> Alert
+                </button>
+              </div>
+            </div>
           `;
         }).join('');
       }

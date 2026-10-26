@@ -151,6 +151,46 @@ def search_cards(
         offset=offset
     )
 
+    # Live fallback if local database has 0 matches for a query
+    keyword = (q or title or "").strip()
+    if total == 0 and len(keyword) >= 2:
+        try:
+            live_res = scraper.live_search(
+                name=keyword,
+                sort="price" if "price" in (sort or "") else None,
+                limit=page_size,
+                offset=offset,
+                only_in_stock=False
+            )
+            live_items = live_res.get("cards", [])
+            if is_foil is not None:
+                live_items = [c for c in live_items if c.get("is_foil") == is_foil]
+            if condition:
+                cond_list = [x.strip().upper() for x in condition.split(",") if x.strip()]
+                live_items = [c for c in live_items if c.get("condition", "").upper() in cond_list]
+            if min_price is not None:
+                live_items = [c for c in live_items if c.get("price", 0) >= min_price]
+            if max_price is not None:
+                live_items = [c for c in live_items if c.get("price", 0) <= max_price]
+            if min_stock is not None and min_stock > 1:
+                live_items = [c for c in live_items if c.get("stock", 0) >= min_stock]
+
+            if live_items:
+                live_total = live_res.get("total", len(live_items))
+                total_pages = (live_total + page_size - 1) // page_size if live_total > 0 else 1
+                return {
+                    "items": live_items,
+                    "total": live_total,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": total_pages,
+                    "has_next": page < total_pages,
+                    "has_prev": page > 1,
+                    "is_live": True
+                }
+        except Exception as e:
+            logger.warning(f"Live search fallback in /api/cards failed: {e}")
+
     total_pages = (total + page_size - 1) // page_size if total > 0 else 1
 
     return {
@@ -160,7 +200,8 @@ def search_cards(
         "page_size": page_size,
         "total_pages": total_pages,
         "has_next": page < total_pages,
-        "has_prev": page > 1
+        "has_prev": page > 1,
+        "is_live": False
     }
 
 
@@ -240,7 +281,8 @@ def live_search(
     id_expansion: Optional[int] = Query(None, description="Set ID"),
     sort: Optional[str] = Query("price", description="Sort parameter"),
     limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
+    only_in_stock: bool = Query(False, description="Filter only cards with stock > 0")
 ):
     try:
         return scraper.live_search(
@@ -250,7 +292,8 @@ def live_search(
             id_expansion=id_expansion,
             sort=sort,
             limit=limit,
-            offset=offset
+            offset=offset,
+            only_in_stock=only_in_stock
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"MTG Spot gateway error: {e}")
@@ -291,15 +334,12 @@ def bulk_search_cards(req: BulkSearchRequest):
         # 1. Search in local database
         db_items, _ = db.search_cards(title=card_name, min_stock=1, limit=10, sort_by="price_asc")
 
-        # 2. If nothing in DB or live_check enabled and 0 found, check MTG Spot live API
+        # 2. Check MTG Spot live API if nothing in DB or live_check enabled
         live_items = []
-        if (not db_items) and req.live_check:
+        if req.live_check:
             try:
-                live_res = scraper.live_search(name=card_name, limit=10, sort="price")
-                live_items = [
-                    c for c in live_res.get("cards", [])
-                    if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0
-                ]
+                live_res = scraper.live_search(name=card_name, limit=10, sort="price", only_in_stock=False)
+                live_items = live_res.get("cards", [])
             except Exception as e:
                 logger.warning(f"Live search fallback failed for {card_name}: {e}")
 
@@ -329,10 +369,20 @@ def bulk_search_cards(req: BulkSearchRequest):
                 "all_offers": matching_offers
             })
         else:
+            catalog_match = None
+            catalog_candidates = [
+                c for c in (live_items or db_items)
+                if card_name.lower() in c.get("title", "").lower()
+            ]
+            if catalog_candidates:
+                catalog_candidates.sort(key=lambda x: x.get("price", 999999))
+                catalog_match = catalog_candidates[0]
+
             missing_cards.append({
                 "requested_name": card_name,
                 "quantity": qty,
-                "is_available": False
+                "is_available": False,
+                "catalog_offer": catalog_match
             })
 
     return {
