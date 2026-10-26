@@ -52,6 +52,41 @@ class TestWatchlistAndDiscord(unittest.TestCase):
         self.assertTrue(deleted)
         self.assertIsNone(self.db.get_watchlist_item(item_id))
 
+    def test_watchlist_deduplication(self):
+        # 1. Add "Counterspell"
+        id1, is_new1 = self.db.add_or_update_watchlist_item(
+            card_name="Counterspell",
+            max_price=5.00
+        )
+        self.assertTrue(is_new1)
+
+        # 2. Add "counterspell" again with different price
+        id2, is_new2 = self.db.add_or_update_watchlist_item(
+            card_name="  counterspell  ",
+            max_price=7.50
+        )
+        self.assertFalse(is_new2)
+        self.assertEqual(id1, id2)
+
+        # Check total watchlist count is 1, not 2
+        items = self.db.get_watchlist()
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["max_price"], 7.50)
+
+        # 3. Bulk add with internal duplicate and existing card
+        cards = [
+            {"card_name": "Counterspell", "max_price": 6.00},
+            {"card_name": "Sol Ring", "max_price": 10.00},
+            {"card_name": "sol ring", "max_price": 12.00},
+        ]
+        inserted, existing = self.db.add_watchlist_items_bulk(cards)
+        self.assertEqual(len(inserted), 1)  # Only Sol Ring is newly inserted
+        self.assertEqual(len(existing), 1)  # Counterspell was existing
+
+        # Total in watchlist should now be 2 ("Counterspell" and "Sol Ring")
+        all_items = self.db.get_watchlist()
+        self.assertEqual(len(all_items), 2)
+
     def test_settings(self):
         self.assertIsNone(self.db.get_setting("discord_webhook"))
         self.db.set_setting("discord_webhook", "https://discord.com/api/webhooks/123/abc")

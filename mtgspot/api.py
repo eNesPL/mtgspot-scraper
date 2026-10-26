@@ -427,7 +427,7 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     if not req.card_name or not req.card_name.strip():
         raise HTTPException(status_code=400, detail="Nazwa karty jest wymagana")
 
-    item_id = db.add_watchlist_item(
+    item_id, is_new = db.add_or_update_watchlist_item(
         card_name=req.card_name,
         max_price=req.max_price,
         condition=req.condition,
@@ -441,9 +441,16 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     default_webhook = db.get_setting("discord_webhook")
     check_result = watcher.check_watchlist_item(item, default_webhook)
 
+    message = (
+        f"Karta '{req.card_name}' została dodana do listy obserwowanych!"
+        if is_new else
+        f"Karta '{req.card_name}' już znajdowała się na liście (zaktualizowano parametry)!"
+    )
+
     return {
         "status": "success",
-        "message": f"Karta '{req.card_name}' została dodana do listy obserwowanych!",
+        "is_new": is_new,
+        "message": message,
         "item": item,
         "initial_check": check_result
     }
@@ -489,11 +496,12 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
             "webhook_url": req.webhook_url
         })
 
-    inserted_ids = db.add_watchlist_items_bulk(records)
+    inserted_ids, existing_ids = db.add_watchlist_items_bulk(records)
 
     default_webhook = db.get_setting("discord_webhook")
     checked = []
-    for item_id in inserted_ids:
+    # Initial check for newly inserted items
+    for item_id in (inserted_ids + existing_ids):
         item = db.get_watchlist_item(item_id)
         if item:
             res = watcher.check_watchlist_item(item, default_webhook)
@@ -502,10 +510,18 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
     total_in_stock = sum(1 for r in checked if r.get("in_stock_count", 0) > 0)
     alerts_sent = sum(r.get("alerts_sent", 0) for r in checked)
 
+    if inserted_ids and existing_ids:
+        msg = f"Dodano {len(inserted_ids)} nowych kart do obserwowanych ({len(existing_ids)} było już na liście)."
+    elif existing_ids:
+        msg = f"Wszystkie podane karty ({len(existing_ids)}) znajdowały się już na liście obserwowanych!"
+    else:
+        msg = f"Dodano {len(inserted_ids)} kart do listy obserwowanych!"
+
     return {
         "status": "success",
-        "message": f"Dodano {len(inserted_ids)} kart do listy obserwowanych!",
+        "message": msg,
         "total_added": len(inserted_ids),
+        "total_existing": len(existing_ids),
         "currently_in_stock": total_in_stock,
         "alerts_sent": alerts_sent,
         "results": checked

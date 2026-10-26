@@ -1435,6 +1435,9 @@
             document.getElementById('add-wl-name').value = '';
             document.getElementById('add-wl-price').value = '';
             switchDiscordTab('watchlist');
+            if (data.is_new === false) {
+              alert(data.message);
+            }
           } else {
             alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
           }
@@ -1465,7 +1468,7 @@
           if (res.ok) {
             document.getElementById('add-wl-bulk-text').value = '';
             switchDiscordTab('watchlist');
-            alert(`Pomyślnie dodano ${data.total_added} kart do obserwowanych!`);
+            alert(data.message || `Przetworzono ${data.total_added} kart!`);
           } else {
             alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
           }
@@ -1647,7 +1650,11 @@
           body: JSON.stringify({ cards: lastBulkMissingCards })
         });
         const data = await res.json();
-        btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano do alertów Discord!`;
+        if (data.total_added === 0 && data.total_existing > 0) {
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Karty są już na liście alertów!`;
+        } else {
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano ${data.total_added} kart do alertów!`;
+        }
         btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow';
         loadWatchlist();
       } catch (err) {

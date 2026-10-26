@@ -138,6 +138,28 @@ class Database:
                 );
             """)
 
+            # Deduplicate existing entries in watchlist and add unique index
+            try:
+                cursor.execute("""
+                    SELECT id, card_name FROM watchlist ORDER BY id ASC;
+                """)
+                seen_wl = {}
+                for row_id, cname in cursor.fetchall():
+                    norm = cname.strip().lower()
+                    if norm in seen_wl:
+                        keep_id = seen_wl[norm]
+                        cursor.execute("UPDATE notification_history SET watchlist_id = ? WHERE watchlist_id = ?", (keep_id, row_id))
+                        cursor.execute("DELETE FROM watchlist WHERE id = ?", (row_id,))
+                    else:
+                        seen_wl[norm] = row_id
+
+                cursor.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_watchlist_card_name 
+                    ON watchlist(LOWER(TRIM(card_name)));
+                """)
+            except Exception as e:
+                logger.warning(f"Watchlist migration error: {e}")
+
             # Notification history table to avoid duplicate spamming
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS notification_history (
@@ -496,6 +518,59 @@ class Database:
 
     # ==================== Watchlist Management ====================
 
+    def add_or_update_watchlist_item(
+        self,
+        card_name: str,
+        max_price: Optional[float] = None,
+        condition: Optional[str] = None,
+        is_foil: Optional[bool] = None,
+        expansion: Optional[str] = None,
+        webhook_url: Optional[str] = None
+    ) -> Tuple[int, bool]:
+        """
+        Add a card to watchlist, or update the existing item if it already exists.
+        Returns (item_id, is_new).
+        """
+        clean_name = card_name.strip()
+        if not clean_name:
+            raise ValueError("Card name cannot be empty")
+
+        foil_val = None
+        if is_foil is not None:
+            foil_val = 1 if is_foil else 0
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id FROM watchlist
+                WHERE LOWER(TRIM(card_name)) = LOWER(?)
+                LIMIT 1;
+            """, (clean_name,))
+            existing = cursor.fetchone()
+
+            if existing:
+                item_id = existing["id"]
+                cursor.execute("""
+                    UPDATE watchlist
+                    SET max_price = COALESCE(?, max_price),
+                        condition = COALESCE(?, condition),
+                        is_foil = COALESCE(?, is_foil),
+                        expansion = COALESCE(?, expansion),
+                        webhook_url = COALESCE(?, webhook_url),
+                        is_active = 1
+                    WHERE id = ?;
+                """, (max_price, condition, foil_val, expansion, webhook_url, item_id))
+                conn.commit()
+                return item_id, False
+            else:
+                cursor.execute("""
+                    INSERT INTO watchlist (
+                        card_name, max_price, condition, is_foil, expansion, webhook_url
+                    ) VALUES (?, ?, ?, ?, ?, ?);
+                """, (clean_name, max_price, condition, foil_val, expansion, webhook_url))
+                conn.commit()
+                return cursor.lastrowid, True
+
     def add_watchlist_item(
         self,
         card_name: str,
@@ -505,54 +580,90 @@ class Database:
         expansion: Optional[str] = None,
         webhook_url: Optional[str] = None
     ) -> int:
-        foil_val = None
-        if is_foil is not None:
-            foil_val = 1 if is_foil else 0
-
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO watchlist (
-                    card_name, max_price, condition, is_foil, expansion, webhook_url
-                ) VALUES (?, ?, ?, ?, ?, ?);
-            """, (card_name.strip(), max_price, condition, foil_val, expansion, webhook_url))
-            conn.commit()
-            return cursor.lastrowid
+        item_id, _ = self.add_or_update_watchlist_item(
+            card_name=card_name,
+            max_price=max_price,
+            condition=condition,
+            is_foil=is_foil,
+            expansion=expansion,
+            webhook_url=webhook_url
+        )
+        return item_id
 
     def add_watchlist_items_bulk(
         self,
         cards: List[Dict[str, Any]]
-    ) -> List[int]:
-        """Add multiple cards to watchlist in a single transaction."""
+    ) -> Tuple[List[int], List[int]]:
+        """
+        Add multiple cards to watchlist in a single transaction.
+        Deduplicates within the batch and checks against existing watchlist items.
+        Returns (inserted_ids, existing_ids).
+        """
         if not cards:
-            return []
+            return [], []
 
         inserted_ids = []
+        existing_ids = []
+        seen_in_batch = set()
+
         with self.get_connection() as conn:
             cursor = conn.cursor()
             for c in cards:
                 card_name = c["card_name"].strip()
                 if not card_name:
                     continue
+                norm = card_name.lower()
+                if norm in seen_in_batch:
+                    continue
+                seen_in_batch.add(norm)
+
                 foil_val = None
                 if c.get("is_foil") is not None:
                     foil_val = 1 if c.get("is_foil") else 0
 
                 cursor.execute("""
-                    INSERT INTO watchlist (
-                        card_name, max_price, condition, is_foil, expansion, webhook_url
-                    ) VALUES (?, ?, ?, ?, ?, ?);
-                """, (
-                    card_name,
-                    c.get("max_price"),
-                    c.get("condition"),
-                    foil_val,
-                    c.get("expansion"),
-                    c.get("webhook_url")
-                ))
-                inserted_ids.append(cursor.lastrowid)
+                    SELECT id FROM watchlist
+                    WHERE LOWER(TRIM(card_name)) = ?
+                    LIMIT 1;
+                """, (norm,))
+                existing = cursor.fetchone()
+
+                if existing:
+                    item_id = existing["id"]
+                    cursor.execute("""
+                        UPDATE watchlist
+                        SET max_price = COALESCE(?, max_price),
+                            condition = COALESCE(?, condition),
+                            is_foil = COALESCE(?, is_foil),
+                            expansion = COALESCE(?, expansion),
+                            webhook_url = COALESCE(?, webhook_url),
+                            is_active = 1
+                        WHERE id = ?;
+                    """, (
+                        c.get("max_price"),
+                        c.get("condition"),
+                        foil_val,
+                        c.get("expansion"),
+                        c.get("webhook_url"),
+                        item_id
+                    ))
+                    existing_ids.append(item_id)
+                else:
+                    cursor.execute("""
+                        INSERT INTO watchlist (
+                            card_name, max_price, condition, is_foil, expansion, webhook_url
+                        ) VALUES (?, ?, ?, ?, ?, ?);
+                    """, (
+                        card_name,
+                        c.get("max_price"),
+                        c.get("condition"),
+                        foil_val,
+                        c.get("expansion"),
+                        c.get("webhook_url")
+                    ))
+                    inserted_ids.append(cursor.lastrowid)
             conn.commit()
-        return inserted_ids
+        return inserted_ids, existing_ids
 
     def get_watchlist(self, active_only: bool = False) -> List[Dict[str, Any]]:
         query = "SELECT * FROM watchlist"
