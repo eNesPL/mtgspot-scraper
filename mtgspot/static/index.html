@@ -404,7 +404,7 @@
 
   <!-- Discord Alerts & Watchlist Modal -->
   <div id="discord-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
       
       <!-- Modal Header -->
       <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
@@ -413,8 +413,8 @@
             <i class="fa-brands fa-discord"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Powiadomienia Discord – MTG Spot Watcher</h3>
-            <p class="text-xs text-slate-400">Otrzymuj alerty, gdy poszukiwana karta pojawi się w sklepie</p>
+            <h3 class="text-sm font-bold text-white">Wishlisty & Powiadomienia Discord – MTG Spot</h3>
+            <p class="text-xs text-slate-400">Osobne talie (np. Rakdos, Boros) i alerty, gdy karty pojawią się w sklepie</p>
           </div>
         </div>
         <button onclick="closeDiscordModal()" class="text-slate-400 hover:text-white text-sm">
@@ -425,10 +425,10 @@
       <!-- Navigation Tabs -->
       <div class="flex border-b border-slate-800 gap-2 flex-shrink-0 text-xs">
         <button id="tab-btn-watchlist" onclick="switchDiscordTab('watchlist')" class="px-3.5 py-2 font-semibold border-b-2 border-indigo-500 text-indigo-400">
-          <i class="fa-solid fa-list-check mr-1"></i> Obserwowane karty
+          <i class="fa-solid fa-list-check mr-1"></i> Wishlisty i talie
         </button>
         <button id="tab-btn-add" onclick="switchDiscordTab('add')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
-          <i class="fa-solid fa-plus mr-1"></i> Dodaj nową kartę
+          <i class="fa-solid fa-plus mr-1"></i> Dodaj do listy
         </button>
         <button id="tab-btn-settings" onclick="switchDiscordTab('settings')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
           <i class="fa-solid fa-gear mr-1"></i> Konfiguracja Webhooka
@@ -438,18 +438,37 @@
       <!-- Tab Content Area -->
       <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1 text-xs">
         
-        <!-- Tab 1: Watchlist View -->
+        <!-- Tab 1: Watchlist & Wishlists View -->
         <div id="tab-content-watchlist" class="space-y-3">
-          <div class="flex justify-between items-center">
-            <span class="text-slate-400 text-[11px]">Karty sprawdzane automatycznie w tle</span>
-            <button onclick="checkWatchlistNow()" id="btn-check-watchlist" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white border border-slate-700 transition flex items-center gap-1.5 text-xs">
-              <i id="check-wl-icon" class="fa-solid fa-arrows-rotate text-[11px]"></i> Sprawdź teraz
+          
+          <!-- Wishlists Pills Bar -->
+          <div class="flex items-center justify-between gap-2 bg-slate-950/40 p-2 rounded-xl border border-slate-800">
+            <div id="wishlist-pills" class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar flex-1 py-0.5">
+              <!-- Rendered dynamically -->
+            </div>
+            <button onclick="promptCreateWishlist()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1 font-semibold text-[11px] whitespace-nowrap flex-shrink-0" title="Utwórz nową wishlistę / talię">
+              <i class="fa-solid fa-plus text-[10px]"></i> Nowa lista
+            </button>
+          </div>
+
+          <!-- Active Wishlist Actions & Title -->
+          <div class="flex justify-between items-center bg-slate-800/40 px-3 py-2 rounded-xl border border-slate-800/80">
+            <div class="flex items-center gap-2">
+              <span id="active-list-title" class="font-bold text-white text-xs">Wszystkie obserwowane</span>
+              <span id="active-list-stats" class="text-[10px] text-slate-400"></span>
+              <div id="active-list-manage-btns" class="hidden flex items-center gap-1">
+                <button onclick="promptEditWishlist()" class="text-slate-400 hover:text-white p-1" title="Zmień nazwę listy"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                <button onclick="deleteCurrentWishlist()" id="btn-del-wishlist" class="text-rose-400 hover:text-rose-300 p-1" title="Usuń tę listę"><i class="fa-solid fa-trash text-[10px]"></i></button>
+              </div>
+            </div>
+            <button onclick="checkWatchlistNow()" id="btn-check-watchlist" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow shadow-indigo-600/20 transition flex items-center gap-1.5 text-[11px] font-semibold">
+              <i id="check-wl-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i> <span id="check-wl-label">Sprawdź teraz</span>
             </button>
           </div>
 
           <div id="watchlist-empty" class="hidden text-center py-8 text-slate-500">
             <i class="fa-solid fa-bell-slash text-2xl mb-2"></i>
-            <p>Nie obserwujesz jeszcze żadnych kart.</p>
+            <p id="watchlist-empty-text">Nie obserwujesz jeszcze żadnych kart w tej liście.</p>
             <button onclick="switchDiscordTab('add')" class="mt-2 text-indigo-400 hover:underline">Dodaj pierwszą kartę</button>
           </div>
 
@@ -458,10 +477,11 @@
               <thead class="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[10px]">
                 <tr>
                   <th class="px-3 py-2">Karta</th>
+                  <th id="th-list-col" class="px-2 py-2">Talia / Lista</th>
                   <th class="px-3 py-2 text-center">Limit ceny</th>
                   <th class="px-2 py-2 text-center">Foil</th>
                   <th class="px-3 py-2 text-center">Status</th>
-                  <th class="px-2 py-2 text-right">Akcja</th>
+                  <th class="px-3 py-2 text-right">Akcja</th>
                 </tr>
               </thead>
               <tbody id="watchlist-tbody" class="divide-y divide-slate-800">
@@ -473,11 +493,28 @@
 
         <!-- Tab 2: Add New Card Form -->
         <div id="tab-content-add" class="hidden space-y-3">
+          <!-- Target Wishlist Selector -->
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Docelowa Wishlista / Talia <span class="text-rose-400">*</span></label>
+            <div class="flex gap-2">
+              <select id="add-wl-list-select" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-xs">
+                <!-- Populated dynamically -->
+              </select>
+              <button type="button" onclick="promptCreateWishlist()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold text-xs whitespace-nowrap transition flex items-center gap-1">
+                <i class="fa-solid fa-plus text-[10px]"></i> Nowa lista
+              </button>
+            </div>
+          </div>
+
           <!-- Toggle Single vs Bulk -->
           <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 text-[11px] font-semibold">
             <button type="button" id="btn-mode-single" onclick="setWatchlistAddMode('single')" class="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center">
               Pojedyncza karta
             </button>
+            <button type="button" id="btn-mode-bulk" onclick="setWatchlistAddMode('bulk')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center">
+              Wklej listę kart (Wiele na raz)
+            </button>
+          </div>
             <button type="button" id="btn-mode-bulk" onclick="setWatchlistAddMode('bulk')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center">
               Wklej listę kart (Wiele na raz)
             </button>
@@ -577,6 +614,71 @@
         </button>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Edit Watchlist Card Modal -->
+  <div id="edit-card-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen text-indigo-400"></i> Edycja alertu: <span id="edit-wl-card-name" class="text-indigo-300 font-bold"></span>
+        </h3>
+        <button onclick="closeEditCardModal()" class="text-slate-400 hover:text-white text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="edit-wl-id">
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Przypisana Talia / Wishlista</label>
+          <select id="edit-wl-list-select" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Maks. cena (PLN)</label>
+            <input type="number" id="edit-wl-price" placeholder="Dowolna" min="0" step="0.5"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Wykończenie</label>
+            <select id="edit-wl-foil" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+              <option value="">Wszystkie (Foil & Regular)</option>
+              <option value="false">Tylko Regular</option>
+              <option value="true">Tylko ✨ Foil</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Minimalny stan</label>
+            <select id="edit-wl-cond" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+              <option value="">Dowolny stan</option>
+              <option value="NM">Tylko NM</option>
+              <option value="NM,EX">NM lub EX</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Konkretny dodatek</label>
+            <input type="text" id="edit-wl-expansion" placeholder="Dowolny dodatek"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-2 pt-2 border-t border-slate-800">
+        <button onclick="closeEditCardModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+          Anuluj
+        </button>
+        <button onclick="saveEditCardModal()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20">
+          Zapisz zmiany
+        </button>
+      </div>
     </div>
   </div>
 
@@ -1211,9 +1313,14 @@
 
     // ==================== Discord Alerts & Watchlist UI Logic ====================
 
-    function openDiscordModal() {
+    let currentWishlistId = null; // null = all wishlists
+    let wishlistsData = [];
+    let watchlistCards = [];
+
+    async function openDiscordModal() {
       document.getElementById('discord-modal').classList.remove('hidden');
-      loadWatchlist();
+      await loadWishlists();
+      await loadWatchlist();
       loadDiscordSettings();
     }
 
@@ -1221,7 +1328,7 @@
       document.getElementById('discord-modal').classList.add('hidden');
     }
 
-    function switchDiscordTab(tab) {
+    async function switchDiscordTab(tab) {
       const tabs = ['watchlist', 'add', 'settings'];
       tabs.forEach(t => {
         const btn = document.getElementById(`tab-btn-${t}`);
@@ -1234,20 +1341,195 @@
           content.classList.add('hidden');
         }
       });
-      if (tab === 'watchlist') loadWatchlist();
+      if (tab === 'watchlist') {
+        await loadWishlists();
+        await loadWatchlist();
+      }
+      if (tab === 'add') {
+        await loadWishlists();
+      }
       if (tab === 'settings') loadDiscordSettings();
+    }
+
+    async function loadWishlists() {
+      try {
+        const res = await fetch('/api/wishlists');
+        wishlistsData = await res.json();
+
+        // 1. Render pills
+        const pillsWrap = document.getElementById('wishlist-pills');
+        const totalCards = wishlistsData.reduce((acc, w) => acc + (w.card_count || 0), 0);
+
+        const allPill = `
+          <button onclick="selectWishlist(null)" class="px-3 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${currentWishlistId === null ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+            Wszystkie <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] ${currentWishlistId === null ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-400'}">${totalCards}</span>
+          </button>
+        `;
+
+        const listPills = wishlistsData.map(w => {
+          const isActive = currentWishlistId === w.id;
+          return `
+            <button onclick="selectWishlist(${w.id})" class="px-3 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${isActive ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
+              ${w.name} <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-400'}">${w.card_count || 0}</span>
+            </button>
+          `;
+        }).join('');
+
+        if (pillsWrap) pillsWrap.innerHTML = allPill + listPills;
+
+        // 2. Populate dropdowns in Add Tab and Edit Modal
+        const addSelect = document.getElementById('add-wl-list-select');
+        if (addSelect) {
+          const currentVal = addSelect.value;
+          addSelect.innerHTML = wishlistsData.map(w => `
+            <option value="${w.id}">${w.name} (${w.card_count || 0} kart)</option>
+          `).join('');
+          if (currentWishlistId) {
+            addSelect.value = currentWishlistId;
+          } else if (currentVal && wishlistsData.some(w => w.id == currentVal)) {
+            addSelect.value = currentVal;
+          } else if (wishlistsData.length > 0) {
+            addSelect.value = wishlistsData[0].id;
+          }
+        }
+
+        const editSelect = document.getElementById('edit-wl-list-select');
+        if (editSelect) {
+          editSelect.innerHTML = wishlistsData.map(w => `
+            <option value="${w.id}">${w.name}</option>
+          `).join('');
+        }
+
+        // 3. Update header info
+        const titleEl = document.getElementById('active-list-title');
+        const statsEl = document.getElementById('active-list-stats');
+        const manageBtns = document.getElementById('active-list-manage-btns');
+        const checkBtnLabel = document.getElementById('check-wl-label');
+
+        if (currentWishlistId === null) {
+          if (titleEl) titleEl.textContent = 'Wszystkie listy i talie';
+          if (statsEl) statsEl.textContent = `(${totalCards} kart)`;
+          if (manageBtns) manageBtns.classList.add('hidden');
+          if (checkBtnLabel) checkBtnLabel.textContent = 'Sprawdź wszystkie';
+        } else {
+          const cur = wishlistsData.find(w => w.id === currentWishlistId);
+          if (cur) {
+            if (titleEl) titleEl.textContent = cur.name;
+            if (statsEl) statsEl.textContent = `(${cur.card_count || 0} kart${cur.in_stock_count ? `, 🟢 ${cur.in_stock_count} w sklepie` : ''})`;
+            if (manageBtns) manageBtns.classList.remove('hidden');
+            if (checkBtnLabel) checkBtnLabel.textContent = `Sprawdź tę listę`;
+            const delBtn = document.getElementById('btn-del-wishlist');
+            if (delBtn) {
+              delBtn.style.display = cur.id === 1 ? 'none' : 'inline-block';
+            }
+          }
+        }
+
+      } catch (err) {
+        console.error('Błąd pobierania wishlist:', err);
+      }
+    }
+
+    function selectWishlist(listId) {
+      currentWishlistId = listId;
+      loadWishlists();
+      loadWatchlist();
+    }
+
+    async function promptCreateWishlist() {
+      const name = prompt('Podaj nazwę nowej wishlisty / talii (np. Rakdos deck, Boros deck, Sideboard):');
+      if (!name || !name.trim()) return;
+
+      try {
+        const res = await fetch('/api/wishlists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentWishlistId = data.list.id;
+          await loadWishlists();
+          await loadWatchlist();
+        } else {
+          alert('Błąd: ' + (data.detail || 'Nie udało się utworzyć listy'));
+        }
+      } catch (err) {
+        alert('Błąd sieci: ' + err);
+      }
+    }
+
+    async function promptEditWishlist() {
+      if (!currentWishlistId) return;
+      const cur = wishlistsData.find(w => w.id === currentWishlistId);
+      if (!cur) return;
+
+      const newName = prompt(`Zmień nazwę listy "${cur.name}":`, cur.name);
+      if (!newName || !newName.trim() || newName.trim() === cur.name) return;
+
+      try {
+        const res = await fetch(`/api/wishlists/${currentWishlistId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newName.trim() })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          await loadWishlists();
+          await loadWatchlist();
+        } else {
+          alert('Błąd: ' + (data.detail || 'Nie udało się zaktualizować listy'));
+        }
+      } catch (err) {
+        alert('Błąd sieci: ' + err);
+      }
+    }
+
+    async function deleteCurrentWishlist() {
+      if (!currentWishlistId || currentWishlistId === 1) return;
+      const cur = wishlistsData.find(w => w.id === currentWishlistId);
+      if (!cur) return;
+
+      if (!confirm(`Czy na pewno chcesz usunąć listę "${cur.name}" wraz ze wszystkimi ${cur.card_count || 0} obserwowanymi w niej kartami?`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/wishlists/${currentWishlistId}`, {
+          method: 'DELETE'
+        });
+        if (res.ok) {
+          currentWishlistId = null;
+          await loadWishlists();
+          await loadWatchlist();
+        } else {
+          const data = await res.json();
+          alert('Błąd: ' + (data.detail || 'Nie udało się usunąć listy'));
+        }
+      } catch (err) {
+        alert('Błąd sieci: ' + err);
+      }
     }
 
     async function loadWatchlist() {
       try {
-        const res = await fetch('/api/watchlist');
+        const url = currentWishlistId ? `/api/watchlist?list_id=${currentWishlistId}` : '/api/watchlist';
+        const res = await fetch(url);
         const items = await res.json();
+        watchlistCards = items;
         
-        document.getElementById('stat-watchlist-count').textContent = items.length;
+        const totalCards = wishlistsData.reduce((acc, w) => acc + (w.card_count || 0), 0);
+        const statCountEl = document.getElementById('stat-watchlist-count');
+        if (statCountEl) statCountEl.textContent = totalCards;
 
         const tbody = document.getElementById('watchlist-tbody');
         const empty = document.getElementById('watchlist-empty');
         const tableWrap = document.getElementById('watchlist-table-wrap');
+        const thListCol = document.getElementById('th-list-col');
+
+        if (thListCol) {
+          thListCol.style.display = currentWishlistId === null ? '' : 'none';
+        }
 
         if (!items || items.length === 0) {
           empty.classList.remove('hidden');
@@ -1266,6 +1548,9 @@
 
           const priceStr = it.max_price ? `${it.max_price.toFixed(2)} zł` : '<span class="text-slate-500">Dowolna</span>';
           const foilStr = it.is_foil === true ? '✨ Foil' : (it.is_foil === false ? 'Regular' : 'Dowolne');
+          const listColHtml = currentWishlistId === null 
+            ? `<td class="px-2 py-2.5"><span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-semibold whitespace-nowrap">${it.list_name || 'Główna'}</span></td>` 
+            : '';
 
           return `
             <tr class="hover:bg-slate-800/40 transition">
@@ -1273,10 +1558,14 @@
                 <span class="font-bold text-white block">${it.card_name}</span>
                 ${it.expansion ? `<span class="text-[10px] text-slate-500">${it.expansion}</span>` : ''}
               </td>
+              ${listColHtml}
               <td class="px-3 py-2.5 text-center font-mono">${priceStr}</td>
               <td class="px-2 py-2.5 text-center text-[10px] text-slate-400">${foilStr}</td>
               <td class="px-3 py-2.5 text-center text-[10px]">${statusBadge}</td>
-              <td class="px-2 py-2.5 text-right">
+              <td class="px-3 py-2.5 text-right whitespace-nowrap space-x-1">
+                <button onclick="openEditWatchlistItemModal(${it.id})" class="text-slate-400 hover:text-indigo-400 p-1 transition" title="Edytuj alert">
+                  <i class="fa-solid fa-pen"></i>
+                </button>
                 <button onclick="deleteWatchlistCard(${it.id})" class="text-rose-400 hover:text-rose-300 p-1 transition" title="Usuń z obserwowanych">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
@@ -1403,7 +1692,62 @@
       }
     }
 
+    function openEditWatchlistItemModal(itemId) {
+      const item = watchlistCards.find(c => c.id === itemId);
+      if (!item) return;
+
+      document.getElementById('edit-wl-id').value = item.id;
+      document.getElementById('edit-wl-card-name').textContent = item.card_name;
+      document.getElementById('edit-wl-price').value = item.max_price !== null && item.max_price !== undefined ? item.max_price : '';
+      document.getElementById('edit-wl-foil').value = item.is_foil === true ? 'true' : (item.is_foil === false ? 'false' : '');
+      document.getElementById('edit-wl-cond').value = item.condition || '';
+      document.getElementById('edit-wl-expansion').value = item.expansion || '';
+      document.getElementById('edit-wl-list-select').value = item.list_id || 1;
+
+      document.getElementById('edit-card-modal').classList.remove('hidden');
+    }
+
+    function closeEditCardModal() {
+      document.getElementById('edit-card-modal').classList.add('hidden');
+    }
+
+    async function saveEditCardModal() {
+      const id = document.getElementById('edit-wl-id').value;
+      const priceVal = document.getElementById('edit-wl-price').value;
+      const maxPrice = priceVal ? parseFloat(priceVal) : null;
+      const foilVal = document.getElementById('edit-wl-foil').value;
+      const isFoil = foilVal === '' ? null : (foilVal === 'true');
+      const condition = document.getElementById('edit-wl-cond').value || null;
+      const expansion = document.getElementById('edit-wl-expansion').value.trim() || null;
+      const listId = parseInt(document.getElementById('edit-wl-list-select').value, 10) || 1;
+
+      try {
+        const res = await fetch(`/api/watchlist/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            max_price: maxPrice,
+            is_foil: isFoil,
+            condition: condition,
+            expansion: expansion,
+            list_id: listId
+          })
+        });
+        if (res.ok) {
+          closeEditCardModal();
+          await loadWishlists();
+          await loadWatchlist();
+        } else {
+          const data = await res.json();
+          alert('Błąd: ' + (data.detail || 'Nie udało się zapisać zmian'));
+        }
+      } catch (err) {
+        alert('Błąd zapisu: ' + err);
+      }
+    }
+
     async function submitAddWatchlist() {
+      const targetListId = parseInt(document.getElementById('add-wl-list-select').value, 10) || 1;
       const priceVal = document.getElementById('add-wl-price').value;
       const maxPrice = priceVal ? parseFloat(priceVal) : null;
       const foilVal = document.getElementById('add-wl-foil').value;
@@ -1424,6 +1768,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               card_name: name,
+              list_id: targetListId,
               max_price: maxPrice,
               is_foil: isFoil,
               condition: condition,
@@ -1434,6 +1779,7 @@
           if (res.ok) {
             document.getElementById('add-wl-name').value = '';
             document.getElementById('add-wl-price').value = '';
+            currentWishlistId = targetListId;
             switchDiscordTab('watchlist');
             if (data.is_new === false) {
               alert(data.message);
@@ -1457,6 +1803,7 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              list_id: targetListId,
               text: text,
               max_price: maxPrice,
               is_foil: isFoil,
@@ -1467,6 +1814,7 @@
           const data = await res.json();
           if (res.ok) {
             document.getElementById('add-wl-bulk-text').value = '';
+            currentWishlistId = targetListId;
             switchDiscordTab('watchlist');
             alert(data.message || `Przetworzono ${data.total_added} kart!`);
           } else {
@@ -1639,6 +1987,15 @@
 
     async function addMissingToWatchlist() {
       if (!lastBulkMissingCards || lastBulkMissingCards.length === 0) return;
+
+      let targetListId = currentWishlistId || 1;
+      if (!currentWishlistId && wishlistsData.length > 1) {
+        const optionsText = wishlistsData.map(w => `${w.id}: ${w.name}`).join('\n');
+        const chosen = prompt(`Do której wishlisty/talii chcesz dodać brakujące karty?\nWpisz numer ID:\n${optionsText}`, "1");
+        if (!chosen) return;
+        targetListId = parseInt(chosen, 10) || 1;
+      }
+
       const btn = document.getElementById('btn-add-missing-wl');
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Dodawanie...`;
@@ -1647,16 +2004,18 @@
         const res = await fetch('/api/watchlist/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cards: lastBulkMissingCards })
+          body: JSON.stringify({ cards: lastBulkMissingCards, list_id: targetListId })
         });
         const data = await res.json();
         if (data.total_added === 0 && data.total_existing > 0) {
-          btn.innerHTML = `<i class="fa-solid fa-check"></i> Karty są już na liście alertów!`;
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Karty są już na liście!`;
         } else {
-          btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano ${data.total_added} kart do alertów!`;
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano ${data.total_added} kart!`;
         }
         btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow';
-        loadWatchlist();
+        currentWishlistId = targetListId;
+        await loadWishlists();
+        await loadWatchlist();
       } catch (err) {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące`;
@@ -1668,6 +2027,10 @@
       openDiscordModal();
       switchDiscordTab('add');
       document.getElementById('add-wl-name').value = cardTitle;
+      if (currentWishlistId) {
+        const select = document.getElementById('add-wl-list-select');
+        if (select) select.value = currentWishlistId;
+      }
       if (currentPrice) {
         // Suggest slightly higher threshold or current price
         document.getElementById('add-wl-price').value = (currentPrice * 1.2).toFixed(2);
@@ -1678,7 +2041,8 @@
       if (!confirm('Czy na pewno chcesz usunąć tę kartę z obserwowanych?')) return;
       try {
         await fetch(`/api/watchlist/${id}`, { method: 'DELETE' });
-        loadWatchlist();
+        await loadWishlists();
+        await loadWatchlist();
       } catch (err) {
         alert('Błąd usuwania: ' + err);
       }
@@ -1691,11 +2055,13 @@
       icon.classList.add('fa-spin');
 
       try {
-        const res = await fetch('/api/watchlist/check', { method: 'POST' });
+        const url = currentWishlistId ? `/api/watchlist/check?list_id=${currentWishlistId}` : '/api/watchlist/check';
+        const res = await fetch(url, { method: 'POST' });
         const data = await res.json();
         icon.classList.remove('fa-spin');
         btn.disabled = false;
-        loadWatchlist();
+        await loadWishlists();
+        await loadWatchlist();
         alert(`Sprawdzono ${data.checked_count} kart. Wysłano ${data.alerts_sent} powiadomień Discord!`);
       } catch (err) {
         icon.classList.remove('fa-spin');

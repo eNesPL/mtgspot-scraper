@@ -87,6 +87,59 @@ class TestWatchlistAndDiscord(unittest.TestCase):
         all_items = self.db.get_watchlist()
         self.assertEqual(len(all_items), 2)
 
+    def test_wishlists_management(self):
+        # 1. Default wishlist exists
+        wishlists = self.db.get_wishlists()
+        self.assertEqual(len(wishlists), 1)
+        self.assertEqual(wishlists[0]["name"], "Główna lista")
+
+        # 2. Create custom wishlists
+        rakdos_id = self.db.create_wishlist("Rakdos deck", description="Commander deck")
+        boros_id = self.db.create_wishlist("Boros deck", description="Standard deck")
+        self.assertIsInstance(rakdos_id, int)
+        self.assertIsInstance(boros_id, int)
+
+        # Total wishlists should now be 3
+        wishlists = self.db.get_wishlists()
+        self.assertEqual(len(wishlists), 3)
+
+        # 3. Add same card to Rakdos and Boros
+        r_item, is_new_r = self.db.add_or_update_watchlist_item("Sol Ring", list_id=rakdos_id, max_price=10.0)
+        b_item, is_new_b = self.db.add_or_update_watchlist_item("Sol Ring", list_id=boros_id, max_price=15.0)
+        self.assertTrue(is_new_r)
+        self.assertTrue(is_new_b)
+        self.assertNotEqual(r_item, b_item)
+
+        # Duplicate in Rakdos should NOT create a new row
+        r_item2, is_new_r2 = self.db.add_or_update_watchlist_item("Sol Ring", list_id=rakdos_id, max_price=12.0)
+        self.assertFalse(is_new_r2)
+        self.assertEqual(r_item, r_item2)
+
+        # Filter watchlist by list_id
+        rakdos_cards = self.db.get_watchlist(list_id=rakdos_id)
+        self.assertEqual(len(rakdos_cards), 1)
+        self.assertEqual(rakdos_cards[0]["card_name"], "Sol Ring")
+        self.assertEqual(rakdos_cards[0]["max_price"], 12.0)
+        self.assertEqual(rakdos_cards[0]["list_name"], "Rakdos deck")
+
+        # Check total cards across all lists
+        all_cards = self.db.get_watchlist()
+        self.assertEqual(len(all_cards), 2)
+
+        # 4. Edit card in watchlist
+        updated = self.db.update_watchlist_item(r_item, max_price=8.0, is_foil=True)
+        self.assertTrue(updated)
+        item_data = self.db.get_watchlist_item(r_item)
+        self.assertEqual(item_data["max_price"], 8.0)
+        self.assertTrue(item_data["is_foil"])
+
+        # 5. Delete Boros wishlist (should delete its Sol Ring, keeping Rakdos intact)
+        self.db.delete_wishlist(boros_id)
+        self.assertEqual(len(self.db.get_wishlists()), 2)
+        self.assertEqual(len(self.db.get_watchlist()), 1)
+        self.assertIsNotNone(self.db.get_watchlist_item(r_item))
+        self.assertIsNone(self.db.get_watchlist_item(b_item))
+
     def test_settings(self):
         self.assertIsNone(self.db.get_setting("discord_webhook"))
         self.db.set_setting("discord_webhook", "https://discord.com/api/webhooks/123/abc")

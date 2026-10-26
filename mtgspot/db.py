@@ -2,6 +2,7 @@ import os
 import sqlite3
 import json
 import logging
+from contextlib import contextmanager
 from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger("mtgspot.db")
@@ -18,13 +19,17 @@ class Database:
         os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         self.init_db()
 
-    def get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def get_connection(self):
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         # Enable WAL mode for better concurrency and fast reads
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
 
     def init_db(self):
         with self.get_connection() as conn:
@@ -121,10 +126,28 @@ class Database:
                 INSERT OR IGNORE INTO scrape_meta (id, status) VALUES (1, 'idle');
             """)
 
+            # Wishlists / Decklists table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS wishlists (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    webhook_url TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            cursor.execute("""
+                INSERT OR IGNORE INTO wishlists (id, name, description)
+                VALUES (1, 'Główna lista', 'Domyślna lista obserwowanych kart');
+            """)
+
             # Watchlist / Alerts table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS watchlist (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    list_id INTEGER DEFAULT 1,
                     card_name TEXT NOT NULL,
                     max_price REAL,
                     condition TEXT,
@@ -134,18 +157,26 @@ class Database:
                     last_stock INTEGER DEFAULT 0,
                     last_notified_at TEXT,
                     is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (list_id) REFERENCES wishlists(id) ON DELETE CASCADE
                 );
             """)
 
-            # Deduplicate existing entries in watchlist and add unique index
+            # Ensure list_id column exists and create compound unique index
             try:
-                cursor.execute("""
-                    SELECT id, card_name FROM watchlist ORDER BY id ASC;
-                """)
+                cursor.execute("PRAGMA table_info(watchlist);")
+                cols = [c[1] for c in cursor.fetchall()]
+                if "list_id" not in cols:
+                    cursor.execute("ALTER TABLE watchlist ADD COLUMN list_id INTEGER DEFAULT 1;")
+                    cursor.execute("UPDATE watchlist SET list_id = 1 WHERE list_id IS NULL;")
+
+                cursor.execute("DROP INDEX IF EXISTS idx_watchlist_card_name;")
+
+                # Deduplicate existing entries in watchlist per list_id
+                cursor.execute("SELECT id, COALESCE(list_id, 1), card_name FROM watchlist ORDER BY id ASC;")
                 seen_wl = {}
-                for row_id, cname in cursor.fetchall():
-                    norm = cname.strip().lower()
+                for row_id, lid, cname in cursor.fetchall():
+                    norm = (lid, cname.strip().lower())
                     if norm in seen_wl:
                         keep_id = seen_wl[norm]
                         cursor.execute("UPDATE notification_history SET watchlist_id = ? WHERE watchlist_id = ?", (keep_id, row_id))
@@ -154,8 +185,8 @@ class Database:
                         seen_wl[norm] = row_id
 
                 cursor.execute("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS idx_watchlist_card_name 
-                    ON watchlist(LOWER(TRIM(card_name)));
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_watchlist_list_card 
+                    ON watchlist(list_id, LOWER(TRIM(card_name)));
                 """)
             except Exception as e:
                 logger.warning(f"Watchlist migration error: {e}")
@@ -516,11 +547,101 @@ class Database:
             """, (key, value))
             conn.commit()
 
+    # ==================== Wishlists Management ====================
+
+    def get_wishlists(self) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    w.id,
+                    w.name,
+                    w.description,
+                    w.webhook_url,
+                    w.is_active,
+                    w.created_at,
+                    COUNT(wl.id) as card_count,
+                    SUM(CASE WHEN wl.last_stock > 0 THEN 1 ELSE 0 END) as in_stock_count
+                FROM wishlists w
+                LEFT JOIN watchlist wl ON wl.list_id = w.id
+                GROUP BY w.id
+                ORDER BY w.id ASC;
+            """)
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_wishlist(self, list_id: int) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            row = conn.execute("SELECT * FROM wishlists WHERE id = ?;", (list_id,)).fetchone()
+            return dict(row) if row else None
+
+    def create_wishlist(
+        self,
+        name: str,
+        description: Optional[str] = None,
+        webhook_url: Optional[str] = None
+    ) -> int:
+        clean_name = name.strip()
+        if not clean_name:
+            raise ValueError("Nazwa listy nie może być pusta")
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO wishlists (name, description, webhook_url)
+                VALUES (?, ?, ?);
+            """, (clean_name, description, webhook_url))
+            conn.commit()
+            return cursor.lastrowid
+
+    def update_wishlist(
+        self,
+        list_id: int,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        webhook_url: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            if name is not None and name.strip():
+                updates.append("name = ?")
+                params.append(name.strip())
+            if description is not None:
+                updates.append("description = ?")
+                params.append(description)
+            if webhook_url is not None:
+                updates.append("webhook_url = ?")
+                params.append(webhook_url or None)
+            if is_active is not None:
+                updates.append("is_active = ?")
+                params.append(1 if is_active else 0)
+
+            if not updates:
+                return False
+
+            params.append(list_id)
+            cursor.execute(f"UPDATE wishlists SET {', '.join(updates)} WHERE id = ?;", params)
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_wishlist(self, list_id: int) -> bool:
+        if list_id == 1:
+            raise ValueError("Nie można usunąć głównej listy domyślnej")
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM notification_history WHERE watchlist_id IN (SELECT id FROM watchlist WHERE list_id = ?);", (list_id,))
+            cursor.execute("DELETE FROM watchlist WHERE list_id = ?;", (list_id,))
+            cursor.execute("DELETE FROM wishlists WHERE id = ?;", (list_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
     # ==================== Watchlist Management ====================
 
     def add_or_update_watchlist_item(
         self,
         card_name: str,
+        list_id: int = 1,
         max_price: Optional[float] = None,
         condition: Optional[str] = None,
         is_foil: Optional[bool] = None,
@@ -528,12 +649,13 @@ class Database:
         webhook_url: Optional[str] = None
     ) -> Tuple[int, bool]:
         """
-        Add a card to watchlist, or update the existing item if it already exists.
+        Add a card to a specific wishlist, or update the existing item in that list.
         Returns (item_id, is_new).
         """
         clean_name = card_name.strip()
         if not clean_name:
             raise ValueError("Card name cannot be empty")
+        list_id = int(list_id or 1)
 
         foil_val = None
         if is_foil is not None:
@@ -543,9 +665,9 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id FROM watchlist
-                WHERE LOWER(TRIM(card_name)) = LOWER(?)
+                WHERE list_id = ? AND LOWER(TRIM(card_name)) = LOWER(?)
                 LIMIT 1;
-            """, (clean_name,))
+            """, (list_id, clean_name))
             existing = cursor.fetchone()
 
             if existing:
@@ -565,15 +687,16 @@ class Database:
             else:
                 cursor.execute("""
                     INSERT INTO watchlist (
-                        card_name, max_price, condition, is_foil, expansion, webhook_url
-                    ) VALUES (?, ?, ?, ?, ?, ?);
-                """, (clean_name, max_price, condition, foil_val, expansion, webhook_url))
+                        list_id, card_name, max_price, condition, is_foil, expansion, webhook_url
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                """, (list_id, clean_name, max_price, condition, foil_val, expansion, webhook_url))
                 conn.commit()
                 return cursor.lastrowid, True
 
     def add_watchlist_item(
         self,
         card_name: str,
+        list_id: int = 1,
         max_price: Optional[float] = None,
         condition: Optional[str] = None,
         is_foil: Optional[bool] = None,
@@ -582,6 +705,7 @@ class Database:
     ) -> int:
         item_id, _ = self.add_or_update_watchlist_item(
             card_name=card_name,
+            list_id=list_id,
             max_price=max_price,
             condition=condition,
             is_foil=is_foil,
@@ -592,15 +716,17 @@ class Database:
 
     def add_watchlist_items_bulk(
         self,
-        cards: List[Dict[str, Any]]
+        cards: List[Dict[str, Any]],
+        list_id: int = 1
     ) -> Tuple[List[int], List[int]]:
         """
-        Add multiple cards to watchlist in a single transaction.
-        Deduplicates within the batch and checks against existing watchlist items.
+        Add multiple cards to a specific wishlist in a single transaction.
+        Deduplicates within the batch and checks against existing items in this list.
         Returns (inserted_ids, existing_ids).
         """
         if not cards:
             return [], []
+        list_id = int(list_id or 1)
 
         inserted_ids = []
         existing_ids = []
@@ -623,9 +749,9 @@ class Database:
 
                 cursor.execute("""
                     SELECT id FROM watchlist
-                    WHERE LOWER(TRIM(card_name)) = ?
+                    WHERE list_id = ? AND LOWER(TRIM(card_name)) = ?
                     LIMIT 1;
-                """, (norm,))
+                """, (list_id, norm))
                 existing = cursor.fetchone()
 
                 if existing:
@@ -651,9 +777,10 @@ class Database:
                 else:
                     cursor.execute("""
                         INSERT INTO watchlist (
-                            card_name, max_price, condition, is_foil, expansion, webhook_url
-                        ) VALUES (?, ?, ?, ?, ?, ?);
+                            list_id, card_name, max_price, condition, is_foil, expansion, webhook_url
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?);
                     """, (
+                        list_id,
                         card_name,
                         c.get("max_price"),
                         c.get("condition"),
@@ -665,12 +792,27 @@ class Database:
             conn.commit()
         return inserted_ids, existing_ids
 
-    def get_watchlist(self, active_only: bool = False) -> List[Dict[str, Any]]:
-        query = "SELECT * FROM watchlist"
+    def get_watchlist(
+        self,
+        list_id: Optional[int] = None,
+        active_only: bool = False
+    ) -> List[Dict[str, Any]]:
+        query = """
+            SELECT 
+                wl.*,
+                COALESCE(w.name, 'Główna lista') as list_name,
+                w.webhook_url as list_webhook_url
+            FROM watchlist wl
+            LEFT JOIN wishlists w ON wl.list_id = w.id
+            WHERE 1=1
+        """
         params = []
+        if list_id is not None:
+            query += " AND wl.list_id = ?"
+            params.append(list_id)
         if active_only:
-            query += " WHERE is_active = 1"
-        query += " ORDER BY id DESC"
+            query += " AND wl.is_active = 1"
+        query += " ORDER BY wl.id DESC"
 
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -683,13 +825,70 @@ class Database:
 
     def get_watchlist_item(self, item_id: int) -> Optional[Dict[str, Any]]:
         with self.get_connection() as conn:
-            row = conn.execute("SELECT * FROM watchlist WHERE id = ?", (item_id,)).fetchone()
+            row = conn.execute("""
+                SELECT 
+                    wl.*,
+                    COALESCE(w.name, 'Główna lista') as list_name,
+                    w.webhook_url as list_webhook_url
+                FROM watchlist wl
+                LEFT JOIN wishlists w ON wl.list_id = w.id
+                WHERE wl.id = ?
+            """, (item_id,)).fetchone()
             if row:
                 d = dict(row)
                 if d["is_foil"] is not None:
                     d["is_foil"] = bool(d["is_foil"])
                 return d
             return None
+
+    def update_watchlist_item(
+        self,
+        item_id: int,
+        card_name: Optional[str] = None,
+        max_price: Optional[float] = None,
+        condition: Optional[str] = None,
+        is_foil: Optional[bool] = None,
+        expansion: Optional[str] = None,
+        list_id: Optional[int] = None,
+        is_active: Optional[bool] = None
+    ) -> bool:
+        foil_val = None
+        if is_foil is not None:
+            foil_val = 1 if is_foil else 0
+
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            updates = []
+            params = []
+            if card_name is not None and card_name.strip():
+                updates.append("card_name = ?")
+                params.append(card_name.strip())
+            if max_price is not None:
+                updates.append("max_price = ?")
+                params.append(max_price)
+            if condition is not None:
+                updates.append("condition = ?")
+                params.append(condition)
+            if is_foil is not None:
+                updates.append("is_foil = ?")
+                params.append(foil_val)
+            if expansion is not None:
+                updates.append("expansion = ?")
+                params.append(expansion)
+            if list_id is not None:
+                updates.append("list_id = ?")
+                params.append(list_id)
+            if is_active is not None:
+                updates.append("is_active = ?")
+                params.append(1 if is_active else 0)
+
+            if not updates:
+                return False
+
+            params.append(item_id)
+            cursor.execute(f"UPDATE watchlist SET {', '.join(updates)} WHERE id = ?;", params)
+            conn.commit()
+            return cursor.rowcount > 0
 
     def delete_watchlist_item(self, item_id: int) -> bool:
         with self.get_connection() as conn:

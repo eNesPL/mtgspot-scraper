@@ -72,6 +72,46 @@ def send_discord_card_alert(
         if max_p is not None:
             rule_note = f" *(Limit ceny: do {max_p:.2f} zł)*"
 
+    fields = [
+        {
+            "name": "💰 Cena",
+            "value": f"**{price:.2f} zł**",
+            "inline": True
+        },
+        {
+            "name": "📦 W magazynie",
+            "value": f"**{stock} szt.**",
+            "inline": True
+        },
+        {
+            "name": "🔍 Stan karty",
+            "value": f"**{condition}**",
+            "inline": True
+        },
+        {
+            "name": "✨ Wykończenie",
+            "value": foil_text,
+            "inline": True
+        },
+        {
+            "name": "🏷️ Dodatek / Set",
+            "value": expansion,
+            "inline": True
+        },
+        {
+            "name": "⚡ Rzadkość",
+            "value": rarity.capitalize() if rarity else "Nieznana",
+            "inline": True
+        }
+    ]
+
+    if rule and rule.get("list_name"):
+        fields.append({
+            "name": "📋 Wishlista / Talia",
+            "value": f"**{rule['list_name']}**",
+            "inline": True
+        })
+
     embed = {
         "title": f"🎯 Poszukiwana karta dostępna: {title}!",
         "url": card_url,
@@ -80,38 +120,7 @@ def send_discord_card_alert(
         "thumbnail": {
             "url": image_url
         } if image_url else {},
-        "fields": [
-            {
-                "name": "💰 Cena",
-                "value": f"**{price:.2f} zł**",
-                "inline": True
-            },
-            {
-                "name": "📦 W magazynie",
-                "value": f"**{stock} szt.**",
-                "inline": True
-            },
-            {
-                "name": "🔍 Stan karty",
-                "value": f"**{condition}**",
-                "inline": True
-            },
-            {
-                "name": "✨ Wykończenie",
-                "value": foil_text,
-                "inline": True
-            },
-            {
-                "name": "🏷️ Dodatek / Set",
-                "value": expansion,
-                "inline": True
-            },
-            {
-                "name": "⚡ Rzadkość",
-                "value": rarity.capitalize() if rarity else "Nieznana",
-                "inline": True
-            }
-        ],
+        "fields": fields,
         "footer": {
             "text": "MTG Spot Watcher • Kliknij tytuł lub link powyżej, aby przejść do zakupu"
         },

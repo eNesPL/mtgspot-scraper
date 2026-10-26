@@ -34,7 +34,7 @@ class WatchService:
         req_condition = item.get("condition")
         req_foil = item.get("is_foil")
         req_expansion = item.get("expansion")
-        webhook = item.get("webhook_url") or default_webhook
+        webhook = item.get("webhook_url") or item.get("list_webhook_url") or default_webhook
 
         # Query MTG Spot API for in-stock cards with this name
         url = f"https://gateway.mtgspot.pl/api/shop/articles?page[limit]=50&filter[is_in_channel]=1&filter[name]={urllib.parse.quote(card_name)}"
@@ -110,8 +110,12 @@ class WatchService:
             "cards": matching_cards
         }
 
-    def check_all_watchlist(self, default_webhook: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Run check on all active watchlist items."""
+    def check_all_watchlist(
+        self,
+        default_webhook: Optional[str] = None,
+        list_id: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Run check on all active watchlist items (or items in a specific wishlist)."""
         self.is_checking = True
         self.last_run_time = time.time()
         results = []
@@ -119,8 +123,9 @@ class WatchService:
         if not default_webhook:
             default_webhook = self.db.get_setting("discord_webhook")
 
-        items = self.db.get_watchlist(active_only=True)
-        logger.info(f"Checking {len(items)} watchlist items for MTG Spot store stock...")
+        items = self.db.get_watchlist(list_id=list_id, active_only=True)
+        list_label = f"wishlist_id={list_id}" if list_id else "all wishlists"
+        logger.info(f"Checking {len(items)} watchlist items ({list_label}) for MTG Spot store stock...")
 
         for item in items:
             res = self.check_watchlist_item(item, default_webhook)

@@ -399,8 +399,43 @@ def bulk_search_cards(req: BulkSearchRequest):
 
 # ==================== Discord Alerts & Watchlist Models & Endpoints ====================
 
+class WishlistCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+
+class WishlistUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    webhook_url: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 class WatchlistCreateRequest(BaseModel):
     card_name: str
+    list_id: Optional[int] = 1
+    max_price: Optional[float] = None
+    condition: Optional[str] = None
+    is_foil: Optional[bool] = None
+    expansion: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+
+class WatchlistUpdateRequest(BaseModel):
+    card_name: Optional[str] = None
+    max_price: Optional[float] = None
+    condition: Optional[str] = None
+    is_foil: Optional[bool] = None
+    expansion: Optional[str] = None
+    list_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class BulkWatchlistRequest(BaseModel):
+    list_id: Optional[int] = 1
+    text: Optional[str] = None
+    cards: Optional[List[str]] = None
     max_price: Optional[float] = None
     condition: Optional[str] = None
     is_foil: Optional[bool] = None
@@ -417,9 +452,68 @@ class DiscordTestRequest(BaseModel):
     webhook_url: str
 
 
-@app.get("/api/watchlist", summary="Get all watchlisted cards")
-def get_watchlist():
-    return db.get_watchlist()
+# ==================== Wishlists Endpoints ====================
+
+@app.get("/api/wishlists", summary="Get all wishlists / decklists with card counts")
+def get_wishlists():
+    return db.get_wishlists()
+
+
+@app.post("/api/wishlists", summary="Create a new wishlist / decklist")
+def create_wishlist(req: WishlistCreateRequest):
+    if not req.name or not req.name.strip():
+        raise HTTPException(status_code=400, detail="Nazwa wishlisty jest wymagana")
+    try:
+        list_id = db.create_wishlist(
+            name=req.name,
+            description=req.description,
+            webhook_url=req.webhook_url
+        )
+        return {
+            "status": "success",
+            "message": f"Utworzono listę '{req.name.strip()}'!",
+            "list": db.get_wishlist(list_id)
+        }
+    except Exception as e:
+        if "UNIQUE" in str(e).upper():
+            raise HTTPException(status_code=400, detail="Lista o takiej nazwie już istnieje")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/wishlists/{list_id}", summary="Update a wishlist / decklist")
+def update_wishlist(list_id: int, req: WishlistUpdateRequest):
+    success = db.update_wishlist(
+        list_id=list_id,
+        name=req.name,
+        description=req.description,
+        webhook_url=req.webhook_url,
+        is_active=req.is_active
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Lista nie została znaleziona lub brak zmian")
+    return {
+        "status": "success",
+        "message": "Zaktualizowano listę",
+        "list": db.get_wishlist(list_id)
+    }
+
+
+@app.delete("/api/wishlists/{list_id}", summary="Delete a wishlist and its watched cards")
+def delete_wishlist(list_id: int):
+    try:
+        success = db.delete_wishlist(list_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Lista nie została znaleziona")
+        return {"status": "success", "message": "Usunięto listę wraz z jej kartami"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== Watchlist Endpoints ====================
+
+@app.get("/api/watchlist", summary="Get watchlisted cards (optionally filtered by list_id)")
+def get_watchlist(list_id: Optional[int] = None):
+    return db.get_watchlist(list_id=list_id)
 
 
 @app.post("/api/watchlist", summary="Add card to Discord alert watchlist")
@@ -427,8 +521,10 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     if not req.card_name or not req.card_name.strip():
         raise HTTPException(status_code=400, detail="Nazwa karty jest wymagana")
 
+    target_list_id = req.list_id or 1
     item_id, is_new = db.add_or_update_watchlist_item(
         card_name=req.card_name,
+        list_id=target_list_id,
         max_price=req.max_price,
         condition=req.condition,
         is_foil=req.is_foil,
@@ -441,10 +537,11 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     default_webhook = db.get_setting("discord_webhook")
     check_result = watcher.check_watchlist_item(item, default_webhook)
 
+    list_name = item.get("list_name", "Główna lista") if item else "Główna lista"
     message = (
-        f"Karta '{req.card_name}' została dodana do listy obserwowanych!"
+        f"Karta '{req.card_name}' została dodana do listy '{list_name}'!"
         if is_new else
-        f"Karta '{req.card_name}' już znajdowała się na liście (zaktualizowano parametry)!"
+        f"Karta '{req.card_name}' już znajdowała się na liście '{list_name}' (zaktualizowano parametry)!"
     )
 
     return {
@@ -456,17 +553,28 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     }
 
 
-class BulkWatchlistRequest(BaseModel):
-    text: Optional[str] = None
-    cards: Optional[List[str]] = None
-    max_price: Optional[float] = None
-    condition: Optional[str] = None
-    is_foil: Optional[bool] = None
-    expansion: Optional[str] = None
-    webhook_url: Optional[str] = None
+@app.put("/api/watchlist/{item_id}", summary="Update a watchlist item's alert rules or list")
+def update_watchlist_item(item_id: int, req: WatchlistUpdateRequest):
+    success = db.update_watchlist_item(
+        item_id=item_id,
+        card_name=req.card_name,
+        max_price=req.max_price,
+        condition=req.condition,
+        is_foil=req.is_foil,
+        expansion=req.expansion,
+        list_id=req.list_id,
+        is_active=req.is_active
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Element nie został znaleziony lub brak zmian")
+    return {
+        "status": "success",
+        "message": "Zaktualizowano reguły alertu",
+        "item": db.get_watchlist_item(item_id)
+    }
 
 
-@app.post("/api/watchlist/bulk", summary="Add multiple cards to watchlist at once (from pasted list)")
+@app.post("/api/watchlist/bulk", summary="Add multiple cards to a wishlist at once")
 def add_to_watchlist_bulk(req: BulkWatchlistRequest):
     card_entries = []
     if req.text:
@@ -482,8 +590,9 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
     if not card_entries:
         raise HTTPException(status_code=400, detail="Nie podano żadnych kart do dodania")
 
-    # Limit to 100 cards
-    card_entries = card_entries[:100]
+    # Limit to 200 cards
+    card_entries = card_entries[:200]
+    target_list_id = req.list_id or 1
 
     records = []
     for _, name in card_entries:
@@ -496,11 +605,10 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
             "webhook_url": req.webhook_url
         })
 
-    inserted_ids, existing_ids = db.add_watchlist_items_bulk(records)
+    inserted_ids, existing_ids = db.add_watchlist_items_bulk(records, list_id=target_list_id)
 
     default_webhook = db.get_setting("discord_webhook")
     checked = []
-    # Initial check for newly inserted items
     for item_id in (inserted_ids + existing_ids):
         item = db.get_watchlist_item(item_id)
         if item:
@@ -510,12 +618,15 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
     total_in_stock = sum(1 for r in checked if r.get("in_stock_count", 0) > 0)
     alerts_sent = sum(r.get("alerts_sent", 0) for r in checked)
 
+    list_obj = db.get_wishlist(target_list_id)
+    list_name = list_obj["name"] if list_obj else f"ID {target_list_id}"
+
     if inserted_ids and existing_ids:
-        msg = f"Dodano {len(inserted_ids)} nowych kart do obserwowanych ({len(existing_ids)} było już na liście)."
+        msg = f"Dodano {len(inserted_ids)} nowych kart do '{list_name}' ({len(existing_ids)} było już na liście)."
     elif existing_ids:
-        msg = f"Wszystkie podane karty ({len(existing_ids)}) znajdowały się już na liście obserwowanych!"
+        msg = f"Wszystkie podane karty ({len(existing_ids)}) znajdowały się już na liście '{list_name}'!"
     else:
-        msg = f"Dodano {len(inserted_ids)} kart do listy obserwowanych!"
+        msg = f"Dodano {len(inserted_ids)} kart do listy '{list_name}'!"
 
     return {
         "status": "success",
@@ -536,10 +647,10 @@ def delete_from_watchlist(item_id: int):
     return {"status": "success", "message": "Usunięto z listy obserwowanych"}
 
 
-@app.post("/api/watchlist/check", summary="Manually trigger immediate stock check for all watched cards")
-def trigger_watchlist_check():
+@app.post("/api/watchlist/check", summary="Manually trigger immediate stock check (all or specific list)")
+def trigger_watchlist_check(list_id: Optional[int] = None):
     default_webhook = db.get_setting("discord_webhook")
-    results = watcher.check_all_watchlist(default_webhook)
+    results = watcher.check_all_watchlist(default_webhook, list_id=list_id)
     total_alerts = sum(r.get("alerts_sent", 0) for r in results)
     return {
         "status": "success",
