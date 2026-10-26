@@ -232,6 +232,11 @@
           </button>
         </div>
 
+        <button onclick="openBulkSearchModal()" class="text-xs px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 flex items-center gap-1.5 transition whitespace-nowrap shadow">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>Wklej listę kart</span>
+        </button>
+
         <!-- Sort & View Controls -->
         <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
           <div class="flex items-center gap-2 text-xs">
@@ -468,10 +473,29 @@
 
         <!-- Tab 2: Add New Card Form -->
         <div id="tab-content-add" class="hidden space-y-3">
-          <div>
+          <!-- Toggle Single vs Bulk -->
+          <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 text-[11px] font-semibold">
+            <button type="button" id="btn-mode-single" onclick="setWatchlistAddMode('single')" class="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center">
+              Pojedyncza karta
+            </button>
+            <button type="button" id="btn-mode-bulk" onclick="setWatchlistAddMode('bulk')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center">
+              Wklej listę kart (Wiele na raz)
+            </button>
+          </div>
+
+          <!-- Single Card Input -->
+          <div id="wrap-add-single">
             <label class="block text-slate-300 font-semibold mb-1">Nazwa karty <span class="text-rose-400">*</span></label>
             <input type="text" id="add-wl-name" placeholder="np. Vile Entomber, Diabolic Tutor..." 
               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
+          </div>
+
+          <!-- Bulk Card Input -->
+          <div id="wrap-add-bulk" class="hidden">
+            <label class="block text-slate-300 font-semibold mb-1">Wklej listę kart (jedna w linijce) <span class="text-rose-400">*</span></label>
+            <textarea id="add-wl-bulk-text" rows="5" placeholder="1 Vile Entomber&#10;Gravebreaker Lamia&#10;Diabolic Tutor&#10;4 Lightning Bolt"
+              class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 custom-scrollbar"></textarea>
+            <p class="text-[10px] text-slate-500 mt-1">Obsługuje formaty decklist: "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia".</p>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -507,7 +531,7 @@
           </div>
 
           <button onclick="submitAddWatchlist()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
-            <i class="fa-solid fa-plus"></i> Dodaj do obserwowanych
+            <i class="fa-solid fa-plus"></i> <span id="add-wl-btn-label">Dodaj do obserwowanych</span>
           </button>
         </div>
 
@@ -549,6 +573,130 @@
       <!-- Modal Footer -->
       <div class="pt-2 border-t border-slate-800 flex justify-end flex-shrink-0">
         <button onclick="closeDiscordModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+          Zamknij
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Bulk Card Search / Decklist Modal -->
+  <div id="bulk-search-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 flex-shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Wklej listę kart (Wyszukiwarka grupowa / Decklist)</h3>
+            <p class="text-xs text-slate-400">Wklej karty jedna pod drugą, aby sprawdzić ich dostępność i ceny w MTG Spot</p>
+          </div>
+        </div>
+        <button onclick="closeBulkSearchModal()" class="text-slate-400 hover:text-white text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Input Area -->
+      <div class="space-y-3 flex-shrink-0 text-xs">
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="text-slate-300 font-semibold">Lista kart (jedna pod drugą)</label>
+            <span class="text-slate-500 text-[11px]">Obsługuje formaty np. "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia"</span>
+          </div>
+          <textarea id="bulk-search-input" rows="5" placeholder="1 Vile Entomber&#10;Corpse Connoisseur&#10;1 Gravebreaker Lamia&#10;Oriq Loremage&#10;Diabolic Tutor"
+            class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-amber-500 custom-scrollbar"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div class="flex gap-2">
+            <button onclick="clearBulkSearch()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition text-xs">
+              Wyczyść
+            </button>
+            <button onclick="loadSampleDecklist()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition text-xs">
+              Wstaw przykład
+            </button>
+          </div>
+          <button id="btn-run-bulk-search" onclick="runBulkSearch()" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20 text-xs">
+            <i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Area -->
+      <div id="bulk-results-area" class="hidden flex-1 overflow-y-auto custom-scrollbar border-t border-slate-800 pt-3 space-y-3 pr-1 text-xs">
+        
+        <!-- Summary Bar -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+          <div class="text-center">
+            <span class="text-slate-500 text-[10px] uppercase block">Szukane karty</span>
+            <span id="bulk-stat-total" class="font-bold text-white text-sm">0</span>
+          </div>
+          <div class="text-center">
+            <span class="text-emerald-500 text-[10px] uppercase block">Dostępne w sklepie</span>
+            <span id="bulk-stat-avail" class="font-bold text-emerald-400 text-sm">0</span>
+          </div>
+          <div class="text-center">
+            <span class="text-rose-400 text-[10px] uppercase block">Brak na stanie</span>
+            <span id="bulk-stat-missing" class="font-bold text-rose-400 text-sm">0</span>
+          </div>
+          <div class="text-center">
+            <span class="text-amber-400 text-[10px] uppercase block">Koszt dostępnych</span>
+            <span id="bulk-stat-cost" class="font-bold text-amber-400 text-sm">0.00 zł</span>
+          </div>
+        </div>
+
+        <!-- Missing action bar -->
+        <div id="bulk-missing-action" class="hidden bg-indigo-950/40 border border-indigo-700/40 rounded-xl p-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-indigo-300 text-xs">
+            <i class="fa-brands fa-discord text-base"></i>
+            <span>Część kart jest obecnie wyprzedana. Chcesz dodać brakujące do powiadomień Discord?</span>
+          </div>
+          <button onclick="addMissingToWatchlist()" id="btn-add-missing-wl" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow">
+            <i class="fa-solid fa-bell"></i> Obserwuj brakujące (<span id="missing-count-btn">0</span>)
+          </button>
+        </div>
+
+        <!-- Available Cards Table -->
+        <div id="bulk-available-wrap">
+          <h4 class="font-bold text-white text-xs mb-2 flex items-center gap-1.5 text-emerald-400">
+            <i class="fa-solid fa-circle-check"></i> Dostępne od ręki na MTG Spot
+          </h4>
+          <div class="border border-slate-800 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-[11px]">
+              <thead class="bg-slate-800/80 text-slate-400 uppercase text-[10px]">
+                <tr>
+                  <th class="px-3 py-2">Karta</th>
+                  <th class="px-3 py-2">Najtańszy dodatek</th>
+                  <th class="px-2 py-2 text-center">Stan</th>
+                  <th class="px-3 py-2 text-center">Ilość w sklepie</th>
+                  <th class="px-3 py-2 text-right">Cena</th>
+                  <th class="px-3 py-2 text-center">Zakup</th>
+                </tr>
+              </thead>
+              <tbody id="bulk-available-tbody" class="divide-y divide-slate-800"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Missing Cards List -->
+        <div id="bulk-missing-wrap">
+          <h4 class="font-bold text-white text-xs mb-2 flex items-center gap-1.5 text-slate-400">
+            <i class="fa-solid fa-circle-xmark text-rose-400"></i> Brak na stanie (0 szt.)
+          </h4>
+          <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60 p-3">
+            <div id="bulk-missing-list" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="pt-2 border-t border-slate-800 flex justify-end flex-shrink-0">
+        <button onclick="closeBulkSearchModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
           Zamknij
         </button>
       </div>
@@ -1213,8 +1361,33 @@
       }
     }
 
+    let watchlistAddMode = 'single';
+    let lastBulkMissingCards = [];
+
+    function setWatchlistAddMode(mode) {
+      watchlistAddMode = mode;
+      const btnSingle = document.getElementById('btn-mode-single');
+      const btnBulk = document.getElementById('btn-mode-bulk');
+      const wrapSingle = document.getElementById('wrap-add-single');
+      const wrapBulk = document.getElementById('wrap-add-bulk');
+      const btnLabel = document.getElementById('add-wl-btn-label');
+
+      if (mode === 'single') {
+        btnSingle.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center';
+        btnBulk.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center';
+        wrapSingle.classList.remove('hidden');
+        wrapBulk.classList.add('hidden');
+        btnLabel.textContent = 'Dodaj do obserwowanych';
+      } else {
+        btnBulk.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center';
+        btnSingle.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center';
+        wrapSingle.classList.add('hidden');
+        wrapBulk.classList.remove('hidden');
+        btnLabel.textContent = 'Dodaj listę do obserwowanych';
+      }
+    }
+
     async function submitAddWatchlist() {
-      const name = document.getElementById('add-wl-name').value.trim();
       const priceVal = document.getElementById('add-wl-price').value;
       const maxPrice = priceVal ? parseFloat(priceVal) : null;
       const foilVal = document.getElementById('add-wl-foil').value;
@@ -1222,33 +1395,233 @@
       const condition = document.getElementById('add-wl-cond').value || null;
       const expansion = document.getElementById('add-wl-expansion').value.trim() || null;
 
-      if (!name) {
-        alert('Podaj nazwę karty!');
+      if (watchlistAddMode === 'single') {
+        const name = document.getElementById('add-wl-name').value.trim();
+        if (!name) {
+          alert('Podaj nazwę karty!');
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/watchlist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              card_name: name,
+              max_price: maxPrice,
+              is_foil: isFoil,
+              condition: condition,
+              expansion: expansion
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            document.getElementById('add-wl-name').value = '';
+            document.getElementById('add-wl-price').value = '';
+            switchDiscordTab('watchlist');
+          } else {
+            alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+          }
+        } catch (err) {
+          alert('Błąd sieci: ' + err);
+        }
+      } else {
+        // Bulk Add
+        const text = document.getElementById('add-wl-bulk-text').value.trim();
+        if (!text) {
+          alert('Wklej listę kart (jedna pod drugą)!');
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/watchlist/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: text,
+              max_price: maxPrice,
+              is_foil: isFoil,
+              condition: condition,
+              expansion: expansion
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            document.getElementById('add-wl-bulk-text').value = '';
+            switchDiscordTab('watchlist');
+            alert(`Pomyślnie dodano ${data.total_added} kart do obserwowanych!`);
+          } else {
+            alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+          }
+        } catch (err) {
+          alert('Błąd sieci: ' + err);
+        }
+      }
+    }
+
+    // ==================== Bulk Search Modal Logic ====================
+
+    function openBulkSearchModal() {
+      document.getElementById('bulk-search-modal').classList.remove('hidden');
+    }
+
+    function closeBulkSearchModal() {
+      document.getElementById('bulk-search-modal').classList.add('hidden');
+    }
+
+    function clearBulkSearch() {
+      document.getElementById('bulk-search-input').value = '';
+      document.getElementById('bulk-results-area').classList.add('hidden');
+    }
+
+    function loadSampleDecklist() {
+      document.getElementById('bulk-search-input').value = 
+`1 Vile Entomber
+1 Corpse Connoisseur
+1 Gravebreaker Lamia
+1 Oriq Loremage
+1 Diabolic Tutor`;
+    }
+
+    async function runBulkSearch() {
+      const text = document.getElementById('bulk-search-input').value.trim();
+      if (!text) {
+        alert('Wklej najpierw listę kart!');
         return;
       }
 
+      const btn = document.getElementById('btn-run-bulk-search');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sprawdzanie kart...`;
+
       try {
-        const res = await fetch('/api/watchlist', {
+        const res = await fetch('/api/cards/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            card_name: name,
-            max_price: maxPrice,
-            is_foil: isFoil,
-            condition: condition,
-            expansion: expansion
-          })
+          body: JSON.stringify({ text: text, live_check: true })
         });
         const data = await res.json();
-        if (res.ok) {
-          document.getElementById('add-wl-name').value = '';
-          document.getElementById('add-wl-price').value = '';
-          switchDiscordTab('watchlist');
-        } else {
-          alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart`;
+
+        if (!res.ok) {
+          alert('Błąd: ' + (data.detail || 'Nie udało się przetworzyć listy'));
+          return;
         }
+
+        renderBulkResults(data);
+
       } catch (err) {
-        alert('Błąd sieci: ' + err);
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart`;
+        alert('Błąd zapytania: ' + err);
+      }
+    }
+
+    function renderBulkResults(data) {
+      const area = document.getElementById('bulk-results-area');
+      area.classList.remove('hidden');
+
+      const s = data.summary;
+      document.getElementById('bulk-stat-total').textContent = s.total_requested;
+      document.getElementById('bulk-stat-avail').textContent = s.available_count;
+      document.getElementById('bulk-stat-missing').textContent = s.missing_count;
+      document.getElementById('bulk-stat-cost').textContent = `${s.total_estimated_cost.toFixed(2)} zł`;
+
+      // Missing Action Bar
+      lastBulkMissingCards = data.missing.map(m => m.requested_name);
+      const missingBar = document.getElementById('bulk-missing-action');
+      const missingBtnCount = document.getElementById('missing-count-btn');
+      if (lastBulkMissingCards.length > 0) {
+        missingBar.classList.remove('hidden');
+        missingBtnCount.textContent = lastBulkMissingCards.length;
+        document.getElementById('btn-add-missing-wl').disabled = false;
+        document.getElementById('btn-add-missing-wl').innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące (${lastBulkMissingCards.length})`;
+      } else {
+        missingBar.classList.add('hidden');
+      }
+
+      // Available Table
+      const availTbody = document.getElementById('bulk-available-tbody');
+      const availWrap = document.getElementById('bulk-available-wrap');
+      if (data.available.length === 0) {
+        availWrap.classList.add('hidden');
+      } else {
+        availWrap.classList.remove('hidden');
+        availTbody.innerHTML = data.available.map(item => {
+          const offer = item.best_offer;
+          const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 56' fill='%231e293b'%3E%3Crect width='40' height='56' rx='4'/%3E%3C/svg%3E";
+          const condClass = conditionColors[offer.condition] || 'bg-slate-800 text-slate-300 border-slate-700';
+
+          return `
+            <tr class="hover:bg-slate-800/40 transition">
+              <td class="px-3 py-2 flex items-center gap-2.5">
+                <img src="${offer.image || placeholderImg}" class="w-7 h-10 object-cover rounded bg-slate-950 border border-slate-800" onerror="this.src='${placeholderImg}'">
+                <div>
+                  <span class="font-bold text-white block">${item.requested_name}</span>
+                  <span class="text-[10px] text-slate-500">${item.quantity > 1 ? `${item.quantity}x w talii` : '1x'}</span>
+                </div>
+              </td>
+              <td class="px-3 py-2 text-slate-300">${offer.expansion_name || 'Standard'}</td>
+              <td class="px-2 py-2 text-center">
+                <span class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${condClass}">${offer.condition || 'NM'}</span>
+              </td>
+              <td class="px-3 py-2 text-center font-semibold text-slate-200">
+                ${item.total_stock} szt.
+              </td>
+              <td class="px-3 py-2 text-right">
+                <span class="font-black text-amber-400 block">${item.cheapest_price.toFixed(2)} zł</span>
+                ${item.quantity > 1 ? `<span class="text-[10px] text-slate-500">Razem: ${item.subtotal_price.toFixed(2)} zł</span>` : ''}
+              </td>
+              <td class="px-3 py-2 text-center">
+                <a href="${offer.card_url || 'https://mtgspot.pl'}" target="_blank"
+                  class="text-xs px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition inline-flex items-center gap-1 shadow">
+                  Kup <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                </a>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      // Missing List
+      const missingWrap = document.getElementById('bulk-missing-wrap');
+      const missingList = document.getElementById('bulk-missing-list');
+      if (data.missing.length === 0) {
+        missingWrap.classList.add('hidden');
+      } else {
+        missingWrap.classList.remove('hidden');
+        missingList.innerHTML = data.missing.map(m => {
+          return `
+            <span class="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700/80 text-slate-300 flex items-center gap-1.5 text-xs">
+              <span class="text-rose-400 font-bold">✕</span>
+              <span>${m.quantity > 1 ? `${m.quantity}x ` : ''}${m.requested_name}</span>
+            </span>
+          `;
+        }).join('');
+      }
+    }
+
+    async function addMissingToWatchlist() {
+      if (!lastBulkMissingCards || lastBulkMissingCards.length === 0) return;
+      const btn = document.getElementById('btn-add-missing-wl');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Dodawanie...`;
+
+      try {
+        const res = await fetch('/api/watchlist/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cards: lastBulkMissingCards })
+        });
+        const data = await res.json();
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano do alertów Discord!`;
+        btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow';
+        loadWatchlist();
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące`;
+        alert('Błąd dodawania: ' + err);
       }
     }
 

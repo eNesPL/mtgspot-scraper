@@ -519,6 +519,41 @@ class Database:
             conn.commit()
             return cursor.lastrowid
 
+    def add_watchlist_items_bulk(
+        self,
+        cards: List[Dict[str, Any]]
+    ) -> List[int]:
+        """Add multiple cards to watchlist in a single transaction."""
+        if not cards:
+            return []
+
+        inserted_ids = []
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            for c in cards:
+                card_name = c["card_name"].strip()
+                if not card_name:
+                    continue
+                foil_val = None
+                if c.get("is_foil") is not None:
+                    foil_val = 1 if c.get("is_foil") else 0
+
+                cursor.execute("""
+                    INSERT INTO watchlist (
+                        card_name, max_price, condition, is_foil, expansion, webhook_url
+                    ) VALUES (?, ?, ?, ?, ?, ?);
+                """, (
+                    card_name,
+                    c.get("max_price"),
+                    c.get("condition"),
+                    foil_val,
+                    c.get("expansion"),
+                    c.get("webhook_url")
+                ))
+                inserted_ids.append(cursor.lastrowid)
+            conn.commit()
+        return inserted_ids
+
     def get_watchlist(self, active_only: bool = False) -> List[Dict[str, Any]]:
         query = "SELECT * FROM watchlist"
         params = []

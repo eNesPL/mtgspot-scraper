@@ -3,7 +3,7 @@ import tempfile
 import os
 import shutil
 from mtgspot.db import Database
-from mtgspot.scraper import MTGSpotScraper, slugify
+from mtgspot.scraper import MTGSpotScraper, slugify, parse_card_list_text
 
 
 class TestMTGSpot(unittest.TestCase):
@@ -19,6 +19,24 @@ class TestMTGSpot(unittest.TestCase):
         self.assertEqual(slugify("Black Lotus"), "black-lotus")
         self.assertEqual(slugify("Jace, the Mind Sculptor"), "jace-the-mind-sculptor")
         self.assertEqual(slugify("Commander 2021: Extras"), "commander-2021-extras")
+
+    def test_parse_card_list_text(self):
+        raw = """
+        4 Lightning Bolt
+        1x Vile Entomber (MH2) 108
+        // Commander
+        Gravebreaker Lamia
+        2 Corpse Connoisseur *F*
+        # Lands
+        1 Diabolic Tutor #123
+        """
+        parsed = parse_card_list_text(raw)
+        self.assertEqual(len(parsed), 5)
+        self.assertEqual(parsed[0], (4, "Lightning Bolt"))
+        self.assertEqual(parsed[1], (1, "Vile Entomber"))
+        self.assertEqual(parsed[2], (1, "Gravebreaker Lamia"))
+        self.assertEqual(parsed[3], (2, "Corpse Connoisseur"))
+        self.assertEqual(parsed[4], (1, "Diabolic Tutor"))
 
     def test_database_crud_and_fts(self):
         test_cards = [

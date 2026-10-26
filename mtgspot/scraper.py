@@ -2,7 +2,7 @@ import time
 import re
 import logging
 import requests
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 from .db import Database, DEFAULT_DB_PATH
 
 logger = logging.getLogger("mtgspot.scraper")
@@ -24,6 +24,36 @@ def slugify(text: Optional[str]) -> str:
     text = text.lower()
     text = re.sub(r"[^a-z0-9]+", "-", text)
     return text.strip("-")
+
+
+def parse_card_list_text(text: str) -> List[Tuple[int, str]]:
+    """
+    Parse multiline text of card names with optional quantities into (qty, card_name).
+    Supports formats:
+      - 4 Lightning Bolt
+      - 1x Vile Entomber (MH2) 108
+      - Gravebreaker Lamia *F*
+      - Diabolic Tutor #123
+    """
+    results = []
+    for raw_line in text.strip().splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("//") or line.startswith("#"):
+            continue
+        m = re.match(r"^(\d+)\s*x?\s+(.+)$", line)
+        if m:
+            qty = int(m.group(1))
+            name_part = m.group(2)
+        else:
+            qty = 1
+            name_part = line
+        # Strip set brackets like (MH2) 123, [MH2], foil asterisks *F*, numbers
+        clean_name = re.sub(r"\s*[\(\[][a-zA-Z0-9_\-]+[\)\]]\s*\S*", "", name_part)
+        clean_name = re.sub(r"\s*\*.*?\*", "", clean_name)
+        clean_name = re.sub(r"\s*#\d+", "", clean_name).strip()
+        if clean_name:
+            results.append((qty, clean_name))
+    return results
 
 
 class MTGSpotScraper:

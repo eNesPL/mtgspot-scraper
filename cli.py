@@ -8,7 +8,7 @@ import argparse
 import json
 import logging
 from mtgspot.db import Database, DEFAULT_DB_PATH
-from mtgspot.scraper import MTGSpotScraper
+from mtgspot.scraper import MTGSpotScraper, parse_card_list_text
 from mtgspot.discord import send_test_webhook
 from mtgspot.watcher import WatchService
 
@@ -69,6 +69,71 @@ def cmd_search(args):
     print("-" * 80)
 
 
+def cmd_bulk(args):
+    db = Database(args.db)
+    scraper = MTGSpotScraper(db=db)
+
+    raw_text = ""
+    if args.file:
+        with open(args.file, "r", encoding="utf-8") as f:
+            raw_text = f.read()
+    elif args.text:
+        raw_text = args.text
+    elif not sys.stdin.isatty():
+        raw_text = sys.stdin.read()
+    else:
+        print("[!] Podaj listę kart jako tekst lub w pliku: cli.py bulk \"1 Vile Entomber\\nCorpse Connoisseur\"")
+        return
+
+    cards = parse_card_list_text(raw_text)
+    if not cards:
+        print("[!] Nie znaleziono poprawnych nazw kart.")
+        return
+
+    print(f"[*] Sprawdzanie dostępności {len(cards)} kart w MTG Spot...")
+    found = []
+    missing = []
+    total_cost = 0.0
+
+    for qty, card_name in cards:
+        db_items, _ = db.search_cards(title=card_name, min_stock=1, limit=5, sort_by="price_asc")
+        if not db_items:
+            try:
+                live_res = scraper.live_search(name=card_name, limit=5, sort="price")
+                db_items = [c for c in live_res.get("cards", []) if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0]
+            except Exception:
+                pass
+
+        matching = [c for c in db_items if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0]
+        if matching:
+            matching.sort(key=lambda x: x.get("price", 999999))
+            best = matching[0]
+            price = float(best.get("price", 0.0))
+            subtotal = round(price * qty, 2)
+            total_cost += subtotal
+            found.append((qty, card_name, best, subtotal))
+        else:
+            missing.append((qty, card_name))
+
+    print("\n" + "=" * 80)
+    print(f"DOSTĘPNE W MTG SPOT ({len(found)}/{len(cards)}):")
+    print("-" * 80)
+    for qty, name, best, sub in found:
+        foil = "✨ FOIL" if best.get("is_foil") else "REG "
+        exp = (best.get("expansion_name") or "Standard")[:22]
+        print(f"  🟢 {qty}x {name:<26} | {exp:<22} | [{best.get('condition')}] | {foil} | {best.get('stock')} szt. | {best.get('price'):>6.2f} zł (razem {sub:>6.2f} zł)")
+
+    if missing:
+        print("\n" + "-" * 80)
+        print(f"BRAK NA STANIE ({len(missing)}/{len(cards)}):")
+        for qty, name in missing:
+            print(f"  ⚪ {qty}x {name}")
+
+    print("=" * 80)
+    print(f"Podsumowanie: {len(found)}/{len(cards)} dostępnych | Szacowany łączny koszt: {total_cost:.2f} zł")
+    print("=" * 80)
+
+
 def cmd_stats(args):
     db = Database(args.db)
     data = db.get_filter_options()
@@ -117,25 +182,61 @@ def cmd_watchlist(args):
         print("=" * 80)
 
     elif args.action == "add":
-        item_id = db.add_watchlist_item(
-            card_name=args.name,
-            max_price=args.max_price,
-            condition=args.condition,
-            is_foil=args.foil,
-            expansion=args.set,
-            webhook_url=args.webhook
-        )
-        print(f"[+] Dodano '{args.name}' do listy obserwowanych (ID: {item_id})!")
-        # Instant check
-        item = db.get_watchlist_item(item_id)
-        default_webhook = db.get_setting("discord_webhook")
-        res = watcher.check_watchlist_item(item, default_webhook)
-        if res.get("in_stock_count", 0) > 0:
-            print(f"🎉 UWAGA: Karta jest obecnie DOSTĘPNA na MTG Spot! Znaleziono {res['in_stock_count']} sztuk.")
-            if res.get("alerts_sent", 0) > 0:
-                print(f"[+] Wysłano powiadomienie Discord!")
+        raw_names = ""
+        if hasattr(args, "file") and args.file:
+            with open(args.file, "r", encoding="utf-8") as f:
+                raw_names = f.read()
+        elif args.name:
+            raw_names = args.name
+
+        parsed_cards = parse_card_list_text(raw_names)
+        if not parsed_cards:
+            print("[!] Nie podano prawidłowych nazw kart.")
+            return
+
+        if len(parsed_cards) == 1:
+            _, cname = parsed_cards[0]
+            item_id = db.add_watchlist_item(
+                card_name=cname,
+                max_price=args.max_price,
+                condition=args.condition,
+                is_foil=args.foil,
+                expansion=args.set,
+                webhook_url=args.webhook
+            )
+            print(f"[+] Dodano '{cname}' do listy obserwowanych (ID: {item_id})!")
+            item = db.get_watchlist_item(item_id)
+            default_webhook = db.get_setting("discord_webhook")
+            res = watcher.check_watchlist_item(item, default_webhook)
+            if res.get("in_stock_count", 0) > 0:
+                print(f"🎉 UWAGA: Karta jest obecnie DOSTĘPNA na MTG Spot! Znaleziono {res['in_stock_count']} sztuk.")
+            else:
+                print(f"[*] Karta obecnie nie jest na stanie. Monitor powiadomi Cię na Discordzie, gdy się pojawi.")
         else:
-            print(f"[*] Karta obecnie nie jest na stanie. Monitor powiadomi Cię na Discordzie, gdy tylko się pojawi.")
+            # Bulk add
+            records = [{
+                "card_name": name,
+                "max_price": args.max_price,
+                "condition": args.condition,
+                "is_foil": args.foil,
+                "expansion": args.set,
+                "webhook_url": args.webhook
+            } for _, name in parsed_cards]
+
+            ids = db.add_watchlist_items_bulk(records)
+            print(f"[+] Pomyślnie dodano {len(ids)} kart do listy obserwowanych!")
+            default_webhook = db.get_setting("discord_webhook")
+            in_stock_found = 0
+            for iid in ids:
+                item = db.get_watchlist_item(iid)
+                if item:
+                    res = watcher.check_watchlist_item(item, default_webhook)
+                    if res.get("in_stock_count", 0) > 0:
+                        in_stock_found += 1
+                        print(f"  🟢 {item['card_name']}: DOSTĘPNA ({res['in_stock_count']} szt.)")
+                    else:
+                        print(f"  ⚪ {item['card_name']}: oczekiwanie")
+            print(f"[*] Podsumowanie: {in_stock_found}/{len(ids)} kart jest już na stanie w sklepie.")
 
     elif args.action == "remove":
         if db.delete_watchlist_item(args.id):
@@ -255,12 +356,18 @@ def main():
 
     # Watchlist add
     wl_add = wl_sub.add_parser("add", help="Add card to watchlist")
-    wl_add.add_argument("name", help="Card name to watch (e.g. 'Vile Entomber')")
+    wl_add.add_argument("name", nargs="?", default="", help="Card name to watch (or multiline text)")
+    wl_add.add_argument("--file", help="Path to text file containing card names (one per line)")
     wl_add.add_argument("--max-price", type=float, help="Max price alert threshold in PLN")
     wl_add.add_argument("--condition", help="Required condition (e.g. 'NM', 'NM,EX')")
     wl_add.add_argument("--foil", type=lambda x: (str(x).lower() == 'true'), default=None, help="Foil (true/false)")
     wl_add.add_argument("--set", help="Specific expansion name")
     wl_add.add_argument("--webhook", help="Custom Discord webhook URL for this card")
+
+    # Bulk / Decklist search command
+    bulk_parser = subparsers.add_parser("bulk", help="Check availability for a list of cards (paste or decklist file)")
+    bulk_parser.add_argument("text", nargs="?", default="", help="Multiline string of card names")
+    bulk_parser.add_argument("--file", help="Path to text file containing card names (one per line)")
 
     # Watchlist list
     wl_sub.add_parser("list", help="List all watched cards")
@@ -297,6 +404,8 @@ def main():
         cmd_discord(args)
     elif args.command == "watch":
         cmd_watch(args)
+    elif args.command == "bulk":
+        cmd_bulk(args)
 
 
 if __name__ == "__main__":

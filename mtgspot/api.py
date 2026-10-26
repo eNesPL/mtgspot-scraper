@@ -1,15 +1,17 @@
 import os
 import time
+import re
+import urllib.parse
 import threading
 import logging
-from typing import Optional
+from typing import Optional, List, Tuple, Dict, Any
 from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .db import Database, DEFAULT_DB_PATH
-from .scraper import MTGSpotScraper
+from .scraper import MTGSpotScraper, parse_card_list_text
 from .watcher import WatchService
 from .discord import send_test_webhook
 
@@ -254,6 +256,97 @@ def live_search(
         raise HTTPException(status_code=502, detail=f"MTG Spot gateway error: {e}")
 
 
+# ==================== Bulk Paste & Decklist Search ====================
+
+class BulkSearchRequest(BaseModel):
+    text: Optional[str] = None
+    cards: Optional[List[str]] = None
+    live_check: Optional[bool] = True
+
+
+@app.post("/api/cards/bulk", summary="Bulk search cards from pasted list (Decklist checker)")
+def bulk_search_cards(req: BulkSearchRequest):
+    card_entries = []
+    if req.text:
+        card_entries.extend(parse_card_list_text(req.text))
+    if req.cards:
+        for c in req.cards:
+            parsed = parse_card_list_text(c)
+            if parsed:
+                card_entries.extend(parsed)
+            elif c.strip():
+                card_entries.append((1, c.strip()))
+
+    if not card_entries:
+        raise HTTPException(status_code=400, detail="Nie podano żadnych kart do wyszukania")
+
+    # Limit to 100 cards per request
+    card_entries = card_entries[:100]
+
+    found_cards = []
+    missing_cards = []
+    total_cost = 0.0
+
+    for qty, card_name in card_entries:
+        # 1. Search in local database
+        db_items, _ = db.search_cards(title=card_name, min_stock=1, limit=10, sort_by="price_asc")
+
+        # 2. If nothing in DB or live_check enabled and 0 found, check MTG Spot live API
+        live_items = []
+        if (not db_items) and req.live_check:
+            try:
+                live_res = scraper.live_search(name=card_name, limit=10, sort="price")
+                live_items = [
+                    c for c in live_res.get("cards", [])
+                    if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0
+                ]
+            except Exception as e:
+                logger.warning(f"Live search fallback failed for {card_name}: {e}")
+
+        all_offers = db_items if db_items else live_items
+
+        matching_offers = [
+            c for c in all_offers
+            if card_name.lower() in c["title"].lower() and c.get("stock", 0) > 0
+        ]
+
+        if matching_offers:
+            matching_offers.sort(key=lambda x: x.get("price", 999999))
+            cheapest = matching_offers[0]
+            price = float(cheapest.get("price", 0.0))
+            subtotal = round(price * qty, 2)
+            total_cost += subtotal
+            total_stock_all_offers = sum(c.get("stock", 0) for c in matching_offers)
+
+            found_cards.append({
+                "requested_name": card_name,
+                "quantity": qty,
+                "is_available": True,
+                "cheapest_price": price,
+                "subtotal_price": subtotal,
+                "total_stock": total_stock_all_offers,
+                "best_offer": cheapest,
+                "all_offers": matching_offers
+            })
+        else:
+            missing_cards.append({
+                "requested_name": card_name,
+                "quantity": qty,
+                "is_available": False
+            })
+
+    return {
+        "summary": {
+            "total_requested": len(card_entries),
+            "available_count": len(found_cards),
+            "missing_count": len(missing_cards),
+            "total_estimated_cost": round(total_cost, 2)
+        },
+        "available": found_cards,
+        "missing": missing_cards
+    }
+
+
 # ==================== Discord Alerts & Watchlist Models & Endpoints ====================
 
 class WatchlistCreateRequest(BaseModel):
@@ -303,6 +396,69 @@ def add_to_watchlist(req: WatchlistCreateRequest):
         "message": f"Karta '{req.card_name}' została dodana do listy obserwowanych!",
         "item": item,
         "initial_check": check_result
+    }
+
+
+class BulkWatchlistRequest(BaseModel):
+    text: Optional[str] = None
+    cards: Optional[List[str]] = None
+    max_price: Optional[float] = None
+    condition: Optional[str] = None
+    is_foil: Optional[bool] = None
+    expansion: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+
+@app.post("/api/watchlist/bulk", summary="Add multiple cards to watchlist at once (from pasted list)")
+def add_to_watchlist_bulk(req: BulkWatchlistRequest):
+    card_entries = []
+    if req.text:
+        card_entries.extend(parse_card_list_text(req.text))
+    if req.cards:
+        for c in req.cards:
+            parsed = parse_card_list_text(c)
+            if parsed:
+                card_entries.extend(parsed)
+            elif c.strip():
+                card_entries.append((1, c.strip()))
+
+    if not card_entries:
+        raise HTTPException(status_code=400, detail="Nie podano żadnych kart do dodania")
+
+    # Limit to 100 cards
+    card_entries = card_entries[:100]
+
+    records = []
+    for _, name in card_entries:
+        records.append({
+            "card_name": name,
+            "max_price": req.max_price,
+            "condition": req.condition,
+            "is_foil": req.is_foil,
+            "expansion": req.expansion,
+            "webhook_url": req.webhook_url
+        })
+
+    inserted_ids = db.add_watchlist_items_bulk(records)
+
+    default_webhook = db.get_setting("discord_webhook")
+    checked = []
+    for item_id in inserted_ids:
+        item = db.get_watchlist_item(item_id)
+        if item:
+            res = watcher.check_watchlist_item(item, default_webhook)
+            checked.append(res)
+
+    total_in_stock = sum(1 for r in checked if r.get("in_stock_count", 0) > 0)
+    alerts_sent = sum(r.get("alerts_sent", 0) for r in checked)
+
+    return {
+        "status": "success",
+        "message": f"Dodano {len(inserted_ids)} kart do listy obserwowanych!",
+        "total_added": len(inserted_ids),
+        "currently_in_stock": total_in_stock,
+        "alerts_sent": alerts_sent,
+        "results": checked
     }
 
 

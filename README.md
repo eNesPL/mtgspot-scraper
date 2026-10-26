@@ -117,15 +117,30 @@ python3 cli.py search --min-price 10.0 --max-price 50.0 --condition "NM" --sort 
 python3 cli.py stats
 ```
 
+#### Bulk Card Search & Decklist Checker (CLI)
+```bash
+# Check availability for multiple cards (decklist string)
+python3 cli.py bulk "4 Lightning Bolt
+1 Vile Entomber
+1 Corpse Connoisseur
+Gravebreaker Lamia"
+
+# Check cards directly from a file (e.g. exported from Moxfield)
+python3 cli.py bulk --file decklist.txt
+```
+
 #### Discord Watchlist & Notifications (CLI)
 ```bash
 # Set your Discord webhook URL
 python3 cli.py discord --webhook "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN" --test
 
-# Add cards to your alert watchlist
+# Add cards to your alert watchlist (single card or paste multiline)
 python3 cli.py watchlist add "Vile Entomber" --max-price 5.0
 python3 cli.py watchlist add "Gravebreaker Lamia"
 python3 cli.py watchlist add "Diabolic Tutor"
+
+# Add multiple cards to watchlist at once from a file
+python3 cli.py watchlist add --file wantlist.txt
 
 # List all watched cards
 python3 cli.py watchlist list
