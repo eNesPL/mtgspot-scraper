@@ -140,7 +140,13 @@ class Database:
 
             cursor.execute("""
                 INSERT OR IGNORE INTO wishlists (id, name, description)
-                VALUES (1, 'Główna lista', 'Domyślna lista obserwowanych kart');
+                VALUES (1, 'Main Wishlist', 'Default watched cards list');
+            """)
+            cursor.execute("""
+                UPDATE wishlists SET 
+                    name = 'Main Wishlist', 
+                    description = 'Default watched cards list' 
+                WHERE id = 1 AND name = 'Główna lista';
             """)
 
             # Watchlist / Alerts table
@@ -582,7 +588,7 @@ class Database:
     ) -> int:
         clean_name = name.strip()
         if not clean_name:
-            raise ValueError("Nazwa listy nie może być pusta")
+            raise ValueError("Wishlist name cannot be empty")
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -627,7 +633,7 @@ class Database:
 
     def delete_wishlist(self, list_id: int) -> bool:
         if list_id == 1:
-            raise ValueError("Nie można usunąć głównej listy domyślnej")
+            raise ValueError("Cannot delete the default Main Wishlist")
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM notification_history WHERE watchlist_id IN (SELECT id FROM watchlist WHERE list_id = ?);", (list_id,))
@@ -800,7 +806,7 @@ class Database:
         query = """
             SELECT 
                 wl.*,
-                COALESCE(w.name, 'Główna lista') as list_name,
+                COALESCE(w.name, 'Main Wishlist') as list_name,
                 w.webhook_url as list_webhook_url
             FROM watchlist wl
             LEFT JOIN wishlists w ON wl.list_id = w.id
@@ -828,7 +834,7 @@ class Database:
             row = conn.execute("""
                 SELECT 
                     wl.*,
-                    COALESCE(w.name, 'Główna lista') as list_name,
+                    COALESCE(w.name, 'Main Wishlist') as list_name,
                     w.webhook_url as list_webhook_url
                 FROM watchlist wl
                 LEFT JOIN wishlists w ON wl.list_id = w.id

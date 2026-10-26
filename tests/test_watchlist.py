@@ -91,7 +91,7 @@ class TestWatchlistAndDiscord(unittest.TestCase):
         # 1. Default wishlist exists
         wishlists = self.db.get_wishlists()
         self.assertEqual(len(wishlists), 1)
-        self.assertEqual(wishlists[0]["name"], "Główna lista")
+        self.assertEqual(wishlists[0]["name"], "Main Wishlist")
 
         # 2. Create custom wishlists
         rakdos_id = self.db.create_wishlist("Rakdos deck", description="Commander deck")
@@ -148,7 +148,7 @@ class TestWatchlistAndDiscord(unittest.TestCase):
     def test_invalid_webhook_validation(self):
         ok, msg = send_test_webhook("invalid-url")
         self.assertFalse(ok)
-        self.assertIn("Nieprawidłowy adres", msg)
+        self.assertIn("Invalid Discord Webhook", msg)
 
     def test_has_card_been_notified(self):
         self.assertFalse(self.db.has_card_been_notified("Vile Entomber"))
@@ -187,7 +187,7 @@ class TestWatchlistAndDiscord(unittest.TestCase):
             mock_resp.json.return_value = fake_api_response
             mock_resp.raise_for_status.return_value = None
             mock_get.return_value = mock_resp
-            mock_alert.return_value = (True, "Powiadomienie wysłane")
+            mock_alert.return_value = (True, "Alert sent")
 
             # First run: 3 matching offers, but should send ONLY 1 consolidated alert for best price (3.50)
             res1 = watcher.check_watchlist_item(item)

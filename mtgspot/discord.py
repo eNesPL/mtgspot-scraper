@@ -9,19 +9,19 @@ logger = logging.getLogger("mtgspot.discord")
 def send_test_webhook(webhook_url: str) -> Tuple[bool, str]:
     """Send a test notification embed to verify Discord Webhook URL."""
     if not webhook_url or not webhook_url.startswith("https://discord.com/api/webhooks/"):
-        return False, "Nieprawidłowy adres Discord Webhook URL (powinien zaczynać się od https://discord.com/api/webhooks/...)"
+        return False, "Invalid Discord Webhook URL (must start with https://discord.com/api/webhooks/...)"
 
     payload = {
         "username": "MTG Spot Alert",
         "avatar_url": "https://mtgspot.pl/logo.png",
         "embeds": [
             {
-                "title": "✅ Test powiadomień Discord – MTG Spot Watcher",
-                "description": "Twój webhook Discord został pomyślnie połączony ze scraperem **MTG Spot**!\nOtrzymasz powiadomienie, gdy tylko poszukiwana karta pojawi się na stanie sklepu.",
+                "title": "✅ Discord Notifications Test – MTG Spot Watcher",
+                "description": "Your Discord webhook is successfully connected to the **MTG Spot** watcher!\nYou will receive an alert whenever a watched card is restocked.",
                 "color": 0xF59E0B,  # Amber / Gold
                 "fields": [
-                    {"name": "Status", "value": "🟢 Aktywny i gotowy do powiadomień", "inline": True},
-                    {"name": "Sklep", "value": "mtgspot.pl", "inline": True}
+                    {"name": "Status", "value": "🟢 Active & ready for alerts", "inline": True},
+                    {"name": "Store", "value": "mtgspot.pl", "inline": True}
                 ],
                 "footer": {
                     "text": "MTG Spot Card Watcher"
@@ -34,12 +34,12 @@ def send_test_webhook(webhook_url: str) -> Tuple[bool, str]:
     try:
         resp = requests.post(webhook_url, json=payload, timeout=10)
         if resp.status_code in (200, 204):
-            return True, "Wiadomość testowa została pomyślnie wysłana na Discord!"
+            return True, "Test message successfully sent to Discord!"
         else:
-            return False, f"Discord zwrócił błąd HTTP {resp.status_code}: {resp.text}"
+            return False, f"Discord returned HTTP error {resp.status_code}: {resp.text}"
     except Exception as e:
         logger.error(f"Failed to send test Discord webhook: {e}")
-        return False, f"Błąd połączenia z Discordem: {e}"
+        return False, f"Error connecting to Discord: {e}"
 
 
 def send_discord_card_alert(
@@ -54,79 +54,79 @@ def send_discord_card_alert(
     Consolidates multiple offers into a single notification.
     """
     if not webhook_url:
-        return False, "Brak skonfigurowanego Webhook URL"
+        return False, "No Discord Webhook URL configured"
 
-    title = card.get("title", "Karta MTG")
+    title = card.get("title", "MTG Card")
     price = float(card.get("price", 0.0))
     stock = int(card.get("stock", 0))
     display_stock = total_stock if total_stock is not None else stock
-    expansion = card.get("expansion_name", "Nieznany dodatek")
+    expansion = card.get("expansion_name", "Unknown Set")
     condition = card.get("condition", "NM")
     is_foil = card.get("is_foil", False)
     rarity = card.get("rarity", "Common")
     image_url = card.get("image", "")
     card_url = card.get("card_url") or "https://mtgspot.pl/single"
 
-    foil_text = "✨ Foil (Foil)" if is_foil else "Regular (Zwykła)"
+    foil_text = "✨ Foil" if is_foil else "Regular"
     color = 0x10B981 if not is_foil else 0xF59E0B  # Emerald green or Gold for foil
 
     rule_note = ""
     if rule:
         max_p = rule.get("max_price")
         if max_p is not None:
-            rule_note = f" *(Limit ceny: do {max_p:.2f} zł)*"
+            rule_note = f" *(Price limit: up to {max_p:.2f} PLN)*"
 
-    price_label = "💰 Cena" if not matching_offers_count or matching_offers_count <= 1 else "💰 Najlepsza cena"
-    stock_value = f"**{display_stock} szt.**"
+    price_label = "💰 Price" if not matching_offers_count or matching_offers_count <= 1 else "💰 Best Price"
+    stock_value = f"**{display_stock} pcs**"
     if matching_offers_count and matching_offers_count > 1:
-        stock_value = f"**{display_stock} szt.** ({matching_offers_count} ofert od {price:.2f} zł)"
+        stock_value = f"**{display_stock} pcs** ({matching_offers_count} offers from {price:.2f} PLN)"
 
-    desc = f"Właśnie pojawiła się na stanie w **MTG Spot** w cenie **{price:.2f} zł**!{rule_note}"
+    desc = f"Just restocked on **MTG Spot** at **{price:.2f} PLN**!{rule_note}"
     if matching_offers_count and matching_offers_count > 1:
-        desc = f"Właśnie pojawiła się na stanie w **MTG Spot** w cenie od **{price:.2f} zł** ({matching_offers_count} dostępnych ofert, łącznie {display_stock} szt.)!{rule_note}"
+        desc = f"Just restocked on **MTG Spot** from **{price:.2f} PLN** ({matching_offers_count} offers available, {display_stock} pcs total)!{rule_note}"
 
     fields = [
         {
             "name": price_label,
-            "value": f"**{price:.2f} zł**",
+            "value": f"**{price:.2f} PLN**",
             "inline": True
         },
         {
-            "name": "📦 W magazynie",
+            "name": "📦 In Stock",
             "value": stock_value,
             "inline": True
         },
         {
-            "name": "🔍 Stan karty",
+            "name": "🔍 Condition",
             "value": f"**{condition}**",
             "inline": True
         },
         {
-            "name": "✨ Wykończenie",
+            "name": "✨ Finish",
             "value": foil_text,
             "inline": True
         },
         {
-            "name": "🏷️ Dodatek / Set",
+            "name": "🏷️ Set / Expansion",
             "value": expansion,
             "inline": True
         },
         {
-            "name": "⚡ Rzadkość",
-            "value": rarity.capitalize() if rarity else "Nieznana",
+            "name": "⚡ Rarity",
+            "value": rarity.capitalize() if rarity else "Unknown",
             "inline": True
         }
     ]
 
     if rule and rule.get("list_name"):
         fields.append({
-            "name": "📋 Wishlista / Talia",
+            "name": "📋 Wishlist / Deck",
             "value": f"**{rule['list_name']}**",
             "inline": True
         })
 
     embed = {
-        "title": f"🎯 Poszukiwana karta dostępna: {title}!",
+        "title": f"🎯 Watched Card In Stock: {title}!",
         "url": card_url,
         "description": desc,
         "color": color,
@@ -135,7 +135,7 @@ def send_discord_card_alert(
         } if image_url else {},
         "fields": fields,
         "footer": {
-            "text": "MTG Spot Watcher • Kliknij tytuł lub link powyżej, aby przejść do zakupu"
+            "text": "MTG Spot Watcher • Click the title or link above to purchase"
         },
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
@@ -150,12 +150,12 @@ def send_discord_card_alert(
         resp = requests.post(webhook_url, json=payload, timeout=10)
         if resp.status_code in (200, 204):
             logger.info(f"Discord alert successfully sent for '{title}' to webhook")
-            return True, "Powiadomienie wysłane"
+            return True, "Alert sent"
         else:
             msg = f"Discord webhook returned HTTP {resp.status_code}: {resp.text}"
             logger.warning(msg)
             return False, msg
     except Exception as e:
-        msg = f"Błąd wysyłania powiadomienia Discord: {e}"
+        msg = f"Failed to send Discord alert: {e}"
         logger.error(msg)
         return False, msg

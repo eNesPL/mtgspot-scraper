@@ -76,10 +76,10 @@
 
       <!-- Quick Metrics & Actions -->
       <div class="flex items-center gap-3">
-        <div id="stat-cards-badge" onclick="openDiscordModal()" class="cursor-pointer hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 text-xs transition" title="Kliknij, aby otworzyć obserwowane karty">
+        <div id="stat-cards-badge" onclick="openDiscordModal()" class="cursor-pointer hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-indigo-500/50 text-xs transition" title="Click to view watched cards & alerts">
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span id="stat-available-label" class="text-slate-400">Available:</span>
-          <span id="stat-total-available" class="font-semibold text-emerald-400">0</span>
+          <span id="stat-total-available" class="font-semibold text-emerald-400">0/0</span>
         </div>
 
         <a href="/docs" target="_blank" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
@@ -88,7 +88,7 @@
 
         <button id="btn-discord-modal" onclick="openDiscordModal()" class="text-xs font-medium px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition">
           <i class="fa-brands fa-discord"></i>
-          <span>Alerty Discord (<span id="stat-watchlist-count">0</span>)</span>
+          <span>Discord Alerts (<span id="stat-watchlist-count">0</span>)</span>
         </button>
 
         <button id="btn-sync-modal" onclick="openSyncModal()" class="text-xs font-medium px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition">
@@ -185,9 +185,9 @@
             <span id="price-range-label" class="text-amber-400 text-[11px]">Any</span>
           </div>
           <div class="grid grid-cols-2 gap-2">
-            <input type="number" id="price-min" placeholder="Min zł" min="0" step="0.5" oninput="debounceSearch()"
+            <input type="number" id="price-min" placeholder="Min PLN" min="0" step="0.5" oninput="debounceSearch()"
               class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
-            <input type="number" id="price-max" placeholder="Max zł" min="0" step="0.5" oninput="debounceSearch()"
+            <input type="number" id="price-max" placeholder="Max PLN" min="0" step="0.5" oninput="debounceSearch()"
               class="w-full bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500">
           </div>
         </div>
@@ -234,7 +234,7 @@
 
         <button onclick="openBulkSearchModal()" class="text-xs px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 flex items-center gap-1.5 transition whitespace-nowrap shadow">
           <i class="fa-solid fa-layer-group"></i>
-          <span>Wklej listę kart</span>
+          <span>Paste Decklist</span>
         </button>
 
         <!-- Sort & View Controls -->
@@ -413,8 +413,8 @@
             <i class="fa-brands fa-discord"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Wishlisty & Powiadomienia Discord – MTG Spot</h3>
-            <p class="text-xs text-slate-400">Osobne talie (np. Rakdos, Boros) i alerty, gdy karty pojawią się w sklepie</p>
+            <h3 class="text-sm font-bold text-white">Wishlists & Discord Alerts – MTG Spot</h3>
+            <p class="text-xs text-slate-400">Track separate decks (e.g. Rakdos, Boros) and get notified when cards restock</p>
           </div>
         </div>
         <button onclick="closeDiscordModal()" class="text-slate-400 hover:text-white text-sm">
@@ -425,13 +425,13 @@
       <!-- Navigation Tabs -->
       <div class="flex border-b border-slate-800 gap-2 flex-shrink-0 text-xs">
         <button id="tab-btn-watchlist" onclick="switchDiscordTab('watchlist')" class="px-3.5 py-2 font-semibold border-b-2 border-indigo-500 text-indigo-400">
-          <i class="fa-solid fa-list-check mr-1"></i> Wishlisty i talie
+          <i class="fa-solid fa-list-check mr-1"></i> Wishlists & Decks
         </button>
         <button id="tab-btn-add" onclick="switchDiscordTab('add')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
-          <i class="fa-solid fa-plus mr-1"></i> Dodaj do listy
+          <i class="fa-solid fa-plus mr-1"></i> Add Cards
         </button>
         <button id="tab-btn-settings" onclick="switchDiscordTab('settings')" class="px-3.5 py-2 font-semibold text-slate-400 hover:text-slate-200">
-          <i class="fa-solid fa-gear mr-1"></i> Konfiguracja Webhooka
+          <i class="fa-solid fa-gear mr-1"></i> Webhook Settings
         </button>
       </div>
 
@@ -446,42 +446,42 @@
             <div id="wishlist-pills" class="flex items-center gap-1.5 overflow-x-auto custom-scrollbar flex-1 py-0.5">
               <!-- Rendered dynamically -->
             </div>
-            <button onclick="promptCreateWishlist()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1 font-semibold text-[11px] whitespace-nowrap flex-shrink-0" title="Utwórz nową wishlistę / talię">
-              <i class="fa-solid fa-plus text-[10px]"></i> Nowa lista
+            <button onclick="promptCreateWishlist()" class="px-2.5 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 hover:text-indigo-300 border border-indigo-500/30 transition flex items-center gap-1 font-semibold text-[11px] whitespace-nowrap flex-shrink-0" title="Create a new wishlist or deck">
+              <i class="fa-solid fa-plus text-[10px]"></i> New Wishlist
             </button>
           </div>
 
           <!-- Active Wishlist Actions & Title -->
           <div class="flex justify-between items-center bg-slate-800/40 px-3 py-2 rounded-xl border border-slate-800/80">
             <div class="flex items-center gap-2">
-              <span id="active-list-title" class="font-bold text-white text-xs">Wszystkie obserwowane</span>
+              <span id="active-list-title" class="font-bold text-white text-xs">All Watched Cards</span>
               <span id="active-list-stats" class="text-[10px] text-slate-400"></span>
               <div id="active-list-manage-btns" class="hidden flex items-center gap-1">
-                <button onclick="promptEditWishlist()" class="text-slate-400 hover:text-white p-1" title="Zmień nazwę listy"><i class="fa-solid fa-pen text-[10px]"></i></button>
-                <button onclick="deleteCurrentWishlist()" id="btn-del-wishlist" class="text-rose-400 hover:text-rose-300 p-1" title="Usuń tę listę"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                <button onclick="promptEditWishlist()" class="text-slate-400 hover:text-white p-1" title="Rename wishlist"><i class="fa-solid fa-pen text-[10px]"></i></button>
+                <button onclick="deleteCurrentWishlist()" id="btn-del-wishlist" class="text-rose-400 hover:text-rose-300 p-1" title="Delete this wishlist"><i class="fa-solid fa-trash text-[10px]"></i></button>
               </div>
             </div>
             <button onclick="checkWatchlistNow()" id="btn-check-watchlist" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow shadow-indigo-600/20 transition flex items-center gap-1.5 text-[11px] font-semibold">
-              <i id="check-wl-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i> <span id="check-wl-label">Sprawdź teraz</span>
+              <i id="check-wl-icon" class="fa-solid fa-arrows-rotate text-[10px]"></i> <span id="check-wl-label">Check Now</span>
             </button>
           </div>
 
           <div id="watchlist-empty" class="hidden text-center py-8 text-slate-500">
             <i class="fa-solid fa-bell-slash text-2xl mb-2"></i>
-            <p id="watchlist-empty-text">Nie obserwujesz jeszcze żadnych kart w tej liście.</p>
-            <button onclick="switchDiscordTab('add')" class="mt-2 text-indigo-400 hover:underline">Dodaj pierwszą kartę</button>
+            <p id="watchlist-empty-text">No cards tracked in this list yet.</p>
+            <button onclick="switchDiscordTab('add')" class="mt-2 text-indigo-400 hover:underline">Add your first card</button>
           </div>
 
           <div id="watchlist-table-wrap" class="border border-slate-800 rounded-xl overflow-hidden">
             <table class="w-full text-left text-[11px]">
               <thead class="bg-slate-800/80 text-slate-400 uppercase tracking-wider text-[10px]">
                 <tr>
-                  <th class="px-3 py-2">Karta</th>
-                  <th id="th-list-col" class="px-2 py-2">Talia / Lista</th>
-                  <th class="px-3 py-2 text-center">Limit ceny</th>
-                  <th class="px-2 py-2 text-center">Foil</th>
+                  <th class="px-3 py-2">Card</th>
+                  <th id="th-list-col" class="px-2 py-2">Deck / Wishlist</th>
+                  <th class="px-3 py-2 text-center">Price Limit</th>
+                  <th class="px-2 py-2 text-center">Finish</th>
                   <th class="px-3 py-2 text-center">Status</th>
-                  <th class="px-3 py-2 text-right">Akcja</th>
+                  <th class="px-3 py-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody id="watchlist-tbody" class="divide-y divide-slate-800">
@@ -495,13 +495,13 @@
         <div id="tab-content-add" class="hidden space-y-3">
           <!-- Target Wishlist Selector -->
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Docelowa Wishlista / Talia <span class="text-rose-400">*</span></label>
+            <label class="block text-slate-300 font-semibold mb-1">Target Wishlist / Deck <span class="text-rose-400">*</span></label>
             <div class="flex gap-2">
               <select id="add-wl-list-select" class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-xs">
                 <!-- Populated dynamically -->
               </select>
               <button type="button" onclick="promptCreateWishlist()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold text-xs whitespace-nowrap transition flex items-center gap-1">
-                <i class="fa-solid fa-plus text-[10px]"></i> Nowa lista
+                <i class="fa-solid fa-plus text-[10px]"></i> New List
               </button>
             </div>
           </div>
@@ -509,66 +509,62 @@
           <!-- Toggle Single vs Bulk -->
           <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700/80 text-[11px] font-semibold">
             <button type="button" id="btn-mode-single" onclick="setWatchlistAddMode('single')" class="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center">
-              Pojedyncza karta
+              Single Card
             </button>
             <button type="button" id="btn-mode-bulk" onclick="setWatchlistAddMode('bulk')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center">
-              Wklej listę kart (Wiele na raz)
-            </button>
-          </div>
-            <button type="button" id="btn-mode-bulk" onclick="setWatchlistAddMode('bulk')" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center">
-              Wklej listę kart (Wiele na raz)
+              Bulk Paste (Multiple Cards)
             </button>
           </div>
 
           <!-- Single Card Input -->
           <div id="wrap-add-single">
-            <label class="block text-slate-300 font-semibold mb-1">Nazwa karty <span class="text-rose-400">*</span></label>
-            <input type="text" id="add-wl-name" placeholder="np. Vile Entomber, Diabolic Tutor..." 
+            <label class="block text-slate-300 font-semibold mb-1">Card Name <span class="text-rose-400">*</span></label>
+            <input type="text" id="add-wl-name" placeholder="e.g. Vile Entomber, Diabolic Tutor..." 
               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
           </div>
 
           <!-- Bulk Card Input -->
           <div id="wrap-add-bulk" class="hidden">
-            <label class="block text-slate-300 font-semibold mb-1">Wklej listę kart (jedna w linijce) <span class="text-rose-400">*</span></label>
+            <label class="block text-slate-300 font-semibold mb-1">Paste Card List (One per line) <span class="text-rose-400">*</span></label>
             <textarea id="add-wl-bulk-text" rows="5" placeholder="1 Vile Entomber&#10;Gravebreaker Lamia&#10;Diabolic Tutor&#10;4 Lightning Bolt"
               class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-indigo-500 custom-scrollbar"></textarea>
-            <p class="text-[10px] text-slate-500 mt-1">Obsługuje formaty decklist: "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia".</p>
+            <p class="text-[10px] text-slate-500 mt-1">Supports decklist formats: "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia".</p>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-slate-300 font-semibold mb-1">Maksymalna cena (PLN)</label>
-              <input type="number" id="add-wl-price" placeholder="Opcjonalnie np. 15.00" min="0" step="0.5"
+              <label class="block text-slate-300 font-semibold mb-1">Max Price (PLN)</label>
+              <input type="number" id="add-wl-price" placeholder="Optional e.g. 15.00" min="0" step="0.5"
                 class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
             </div>
             <div>
-              <label class="block text-slate-300 font-semibold mb-1">Wykończenie (Foil)</label>
+              <label class="block text-slate-300 font-semibold mb-1">Finish</label>
               <select id="add-wl-foil" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-                <option value="">Wszystkie (Regular & Foil)</option>
-                <option value="false">Tylko Regular (Zwykłe)</option>
-                <option value="true">Tylko ✨ Foil</option>
+                <option value="">All (Regular & Foil)</option>
+                <option value="false">Non-Foil Only (Regular)</option>
+                <option value="true">✨ Foil Only</option>
               </select>
             </div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-slate-300 font-semibold mb-1">Minimalny stan</label>
+              <label class="block text-slate-300 font-semibold mb-1">Minimum Condition</label>
               <select id="add-wl-cond" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-                <option value="">Dowolny stan</option>
-                <option value="NM">Tylko Near Mint (NM)</option>
-                <option value="NM,EX">Near Mint lub Excellent (NM, EX)</option>
+                <option value="">Any Condition</option>
+                <option value="NM">Near Mint (NM) Only</option>
+                <option value="NM,EX">Near Mint or Excellent (NM, EX)</option>
               </select>
             </div>
             <div>
-              <label class="block text-slate-300 font-semibold mb-1">Konkretny dodatek (opcjonalnie)</label>
-              <input type="text" id="add-wl-expansion" placeholder="np. Modern Horizons 2"
+              <label class="block text-slate-300 font-semibold mb-1">Specific Set / Expansion (Optional)</label>
+              <input type="text" id="add-wl-expansion" placeholder="e.g. Modern Horizons 2"
                 class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
             </div>
           </div>
 
           <button onclick="submitAddWatchlist()" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
-            <i class="fa-solid fa-plus"></i> <span id="add-wl-btn-label">Dodaj do obserwowanych</span>
+            <i class="fa-solid fa-plus"></i> <span id="add-wl-btn-label">Add to Watchlist</span>
           </button>
         </div>
 
@@ -579,17 +575,17 @@
             <input type="text" id="discord-webhook-url" placeholder="https://discord.com/api/webhooks/..." 
               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono text-[11px] focus:outline-none focus:border-indigo-500">
             <p class="text-[10px] text-slate-500 mt-1">
-              Wklej webhook z Twojego serwera Discord (Ustawienia kanału -> Integracje -> Webhooki -> Kopiuj adres URL).
+              Paste a webhook from your Discord server (Channel Settings -> Integrations -> Webhooks -> Copy Webhook URL).
             </p>
           </div>
 
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Częstotliwość sprawdzania w tle</label>
+            <label class="block text-slate-300 font-semibold mb-1">Background Check Interval</label>
             <select id="discord-check-interval" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-              <option value="120">Co 2 minuty</option>
-              <option value="300" selected>Co 5 minut (Zalecane)</option>
-              <option value="600">Co 10 minut</option>
-              <option value="1800">Co 30 minut</option>
+              <option value="120">Every 2 minutes</option>
+              <option value="300" selected>Every 5 minutes (Recommended)</option>
+              <option value="600">Every 10 minutes</option>
+              <option value="1800">Every 30 minutes</option>
             </select>
           </div>
 
@@ -597,10 +593,10 @@
 
           <div class="flex gap-2 pt-2">
             <button onclick="testWebhookFromUI()" id="btn-test-webhook" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-medium transition flex items-center justify-center gap-1.5">
-              <i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test
+              <i class="fa-solid fa-paper-plane text-[11px]"></i> Send Test Alert
             </button>
             <button onclick="saveWebhookSettingsFromUI()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
-              <i class="fa-solid fa-floppy-disk text-[11px]"></i> Zapisz ustawienia
+              <i class="fa-solid fa-floppy-disk text-[11px]"></i> Save Settings
             </button>
           </div>
         </div>
@@ -610,7 +606,7 @@
       <!-- Modal Footer -->
       <div class="pt-2 border-t border-slate-800 flex justify-end flex-shrink-0">
         <button onclick="closeDiscordModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
-          Zamknij
+          Close
         </button>
       </div>
 
@@ -622,7 +618,7 @@
     <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <h3 class="text-sm font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-pen text-indigo-400"></i> Edycja alertu: <span id="edit-wl-card-name" class="text-indigo-300 font-bold"></span>
+          <i class="fa-solid fa-pen text-indigo-400"></i> Edit Alert: <span id="edit-wl-card-name" class="text-indigo-300 font-bold"></span>
         </h3>
         <button onclick="closeEditCardModal()" class="text-slate-400 hover:text-white text-sm">
           <i class="fa-solid fa-xmark"></i>
@@ -633,39 +629,39 @@
 
       <div class="space-y-3 text-xs">
         <div>
-          <label class="block text-slate-300 font-semibold mb-1">Przypisana Talia / Wishlista</label>
+          <label class="block text-slate-300 font-semibold mb-1">Assigned Wishlist / Deck</label>
           <select id="edit-wl-list-select" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
           </select>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Maks. cena (PLN)</label>
-            <input type="number" id="edit-wl-price" placeholder="Dowolna" min="0" step="0.5"
+            <label class="block text-slate-300 font-semibold mb-1">Max Price (PLN)</label>
+            <input type="number" id="edit-wl-price" placeholder="Any" min="0" step="0.5"
               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
           </div>
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Wykończenie</label>
+            <label class="block text-slate-300 font-semibold mb-1">Finish</label>
             <select id="edit-wl-foil" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-              <option value="">Wszystkie (Foil & Regular)</option>
-              <option value="false">Tylko Regular</option>
-              <option value="true">Tylko ✨ Foil</option>
+              <option value="">All (Regular & Foil)</option>
+              <option value="false">Non-Foil Only (Regular)</option>
+              <option value="true">✨ Foil Only</option>
             </select>
           </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Minimalny stan</label>
+            <label class="block text-slate-300 font-semibold mb-1">Minimum Condition</label>
             <select id="edit-wl-cond" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
-              <option value="">Dowolny stan</option>
-              <option value="NM">Tylko NM</option>
-              <option value="NM,EX">NM lub EX</option>
+              <option value="">Any Condition</option>
+              <option value="NM">Near Mint (NM) Only</option>
+              <option value="NM,EX">Near Mint or Excellent (NM, EX)</option>
             </select>
           </div>
           <div>
-            <label class="block text-slate-300 font-semibold mb-1">Konkretny dodatek</label>
-            <input type="text" id="edit-wl-expansion" placeholder="Dowolny dodatek"
+            <label class="block text-slate-300 font-semibold mb-1">Specific Set / Expansion (Optional)</label>
+            <input type="text" id="edit-wl-expansion" placeholder="Any set"
               class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500">
           </div>
         </div>
@@ -673,10 +669,10 @@
 
       <div class="flex gap-2 pt-2 border-t border-slate-800">
         <button onclick="closeEditCardModal()" class="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
-          Anuluj
+          Cancel
         </button>
         <button onclick="saveEditCardModal()" class="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition shadow-lg shadow-indigo-600/20">
-          Zapisz zmiany
+          Save Changes
         </button>
       </div>
     </div>
@@ -693,8 +689,8 @@
             <i class="fa-solid fa-layer-group"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-white">Wklej listę kart (Wyszukiwarka grupowa / Decklist)</h3>
-            <p class="text-xs text-slate-400">Wklej karty jedna pod drugą, aby sprawdzić ich dostępność i ceny w MTG Spot</p>
+            <h3 class="text-sm font-bold text-white">Paste Decklist (Bulk Availability Checker)</h3>
+            <p class="text-xs text-slate-400">Paste cards one per line to check real-time stock and prices on MTG Spot</p>
           </div>
         </div>
         <button onclick="closeBulkSearchModal()" class="text-slate-400 hover:text-white text-sm">
@@ -706,8 +702,8 @@
       <div class="space-y-3 flex-shrink-0 text-xs">
         <div>
           <div class="flex justify-between items-center mb-1">
-            <label class="text-slate-300 font-semibold">Lista kart (jedna pod drugą)</label>
-            <span class="text-slate-500 text-[11px]">Obsługuje formaty np. "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia"</span>
+            <label class="text-slate-300 font-semibold">Card List (One per line)</label>
+            <span class="text-slate-500 text-[11px]">Supports decklist formats: "4 Lightning Bolt", "1x Vile Entomber", "Gravebreaker Lamia"</span>
           </div>
           <textarea id="bulk-search-input" rows="5" placeholder="1 Vile Entomber&#10;Corpse Connoisseur&#10;1 Gravebreaker Lamia&#10;Oriq Loremage&#10;Diabolic Tutor"
             class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white font-mono text-xs focus:outline-none focus:border-amber-500 custom-scrollbar"></textarea>
@@ -716,14 +712,14 @@
         <div class="flex items-center justify-between">
           <div class="flex gap-2">
             <button onclick="clearBulkSearch()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition text-xs">
-              Wyczyść
+              Clear
             </button>
             <button onclick="loadSampleDecklist()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 transition text-xs">
-              Wstaw przykład
+              Load Sample
             </button>
           </div>
           <button id="btn-run-bulk-search" onclick="runBulkSearch()" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20 text-xs">
-            <i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart
+            <i class="fa-solid fa-magnifying-glass"></i> Check Card Availability
           </button>
         </div>
       </div>
@@ -734,20 +730,20 @@
         <!-- Summary Bar -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
           <div class="text-center">
-            <span class="text-slate-500 text-[10px] uppercase block">Szukane karty</span>
+            <span class="text-slate-500 text-[10px] uppercase block">Requested Cards</span>
             <span id="bulk-stat-total" class="font-bold text-white text-sm">0</span>
           </div>
           <div class="text-center">
-            <span class="text-emerald-500 text-[10px] uppercase block">Dostępne w sklepie</span>
+            <span class="text-emerald-500 text-[10px] uppercase block">In Store</span>
             <span id="bulk-stat-avail" class="font-bold text-emerald-400 text-sm">0</span>
           </div>
           <div class="text-center">
-            <span class="text-rose-400 text-[10px] uppercase block">Brak na stanie</span>
+            <span class="text-rose-400 text-[10px] uppercase block">Out of Stock</span>
             <span id="bulk-stat-missing" class="font-bold text-rose-400 text-sm">0</span>
           </div>
           <div class="text-center">
-            <span class="text-amber-400 text-[10px] uppercase block">Koszt dostępnych</span>
-            <span id="bulk-stat-cost" class="font-bold text-amber-400 text-sm">0.00 zł</span>
+            <span class="text-amber-400 text-[10px] uppercase block">Estimated Cost</span>
+            <span id="bulk-stat-cost" class="font-bold text-amber-400 text-sm">0.00 PLN</span>
           </div>
         </div>
 
@@ -755,28 +751,28 @@
         <div id="bulk-missing-action" class="hidden bg-indigo-950/40 border border-indigo-700/40 rounded-xl p-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-indigo-300 text-xs">
             <i class="fa-brands fa-discord text-base"></i>
-            <span>Część kart jest obecnie wyprzedana. Chcesz dodać brakujące do powiadomień Discord?</span>
+            <span>Some cards are currently out of stock. Add missing cards to your Discord watchlist?</span>
           </div>
           <button onclick="addMissingToWatchlist()" id="btn-add-missing-wl" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow">
-            <i class="fa-solid fa-bell"></i> Obserwuj brakujące (<span id="missing-count-btn">0</span>)
+            <i class="fa-solid fa-bell"></i> Watch Missing (<span id="missing-count-btn">0</span>)
           </button>
         </div>
 
         <!-- Available Cards Table -->
         <div id="bulk-available-wrap">
           <h4 class="font-bold text-white text-xs mb-2 flex items-center gap-1.5 text-emerald-400">
-            <i class="fa-solid fa-circle-check"></i> Dostępne od ręki na MTG Spot
+            <i class="fa-solid fa-circle-check"></i> Available In Stock on MTG Spot
           </h4>
           <div class="border border-slate-800 rounded-xl overflow-hidden">
             <table class="w-full text-left text-[11px]">
               <thead class="bg-slate-800/80 text-slate-400 uppercase text-[10px]">
                 <tr>
-                  <th class="px-3 py-2">Karta</th>
-                  <th class="px-3 py-2">Najtańszy dodatek</th>
-                  <th class="px-2 py-2 text-center">Stan</th>
-                  <th class="px-3 py-2 text-center">Ilość w sklepie</th>
-                  <th class="px-3 py-2 text-right">Cena</th>
-                  <th class="px-3 py-2 text-center">Zakup</th>
+                  <th class="px-3 py-2">Card</th>
+                  <th class="px-3 py-2">Cheapest Printing</th>
+                  <th class="px-2 py-2 text-center">Condition</th>
+                  <th class="px-3 py-2 text-center">Store Stock</th>
+                  <th class="px-3 py-2 text-right">Price</th>
+                  <th class="px-3 py-2 text-center">Action</th>
                 </tr>
               </thead>
               <tbody id="bulk-available-tbody" class="divide-y divide-slate-800"></tbody>
@@ -787,7 +783,7 @@
         <!-- Missing Cards List -->
         <div id="bulk-missing-wrap">
           <h4 class="font-bold text-white text-xs mb-2 flex items-center gap-1.5 text-slate-400">
-            <i class="fa-solid fa-circle-xmark text-rose-400"></i> Brak na stanie (0 szt.)
+            <i class="fa-solid fa-circle-xmark text-rose-400"></i> Out of Stock (0 pcs)
           </h4>
           <div class="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60 p-3">
             <div id="bulk-missing-list" class="flex flex-wrap gap-2"></div>
@@ -799,7 +795,7 @@
       <!-- Modal Footer -->
       <div class="pt-2 border-t border-slate-800 flex justify-end flex-shrink-0">
         <button onclick="closeBulkSearchModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
-          Zamknij
+          Close
         </button>
       </div>
 
@@ -854,13 +850,13 @@
       const numInStock = parseInt(inStock, 10) || 0;
 
       if (numTotal > 0) {
-        availEl.textContent = `${numInStock} / ${numTotal}`;
+        availEl.textContent = `${numInStock}/${numTotal}`;
         availEl.className = numInStock > 0 ? 'font-semibold text-emerald-400' : 'font-semibold text-slate-400';
-        if (badgeEl) badgeEl.title = `${numInStock} z ${numTotal} obserwowanych kart jest obecnie na stanie w MTG Spot (kliknij, aby otworzyć alerty)`;
+        if (badgeEl) badgeEl.title = `${numInStock} of ${numTotal} watched cards are currently in stock on MTG Spot (click to view alerts)`;
       } else {
-        availEl.textContent = '0';
+        availEl.textContent = '0/0';
         availEl.className = 'font-semibold text-slate-400';
-        if (badgeEl) badgeEl.title = 'Brak obserwowanych kart w alertach';
+        if (badgeEl) badgeEl.title = 'No cards currently in watchlist (click to configure alerts)';
       }
     }
 
@@ -897,7 +893,7 @@
     }
 
     function updateStockSlider(val) {
-      document.getElementById('min-stock-val').textContent = (val == 0) ? '0+ (Wszystkie)' : val + '+';
+      document.getElementById('min-stock-val').textContent = (val == 0) ? '0+ (All)' : val + '+';
     }
 
     function setFoilFilter(val, btn) {
@@ -1105,11 +1101,11 @@
                 </span>
                 ${c.stock > 0 ? `
                   <span class="text-slate-400 flex items-center gap-1">
-                    <i class="fa-solid fa-boxes-stacked text-[10px]"></i> <strong class="text-emerald-400 font-bold">${c.stock}</strong> w sklepie
+                    <i class="fa-solid fa-boxes-stacked text-[10px]"></i> <strong class="text-emerald-400 font-bold">${c.stock}</strong> in store
                   </span>
                 ` : `
                   <span class="text-rose-400 font-semibold text-[10px] bg-rose-500/15 px-2 py-0.5 rounded border border-rose-500/30">
-                    Wyprzedana (0 szt.)
+                    Sold Out (0 pcs)
                   </span>
                 `}
               </div>
@@ -1117,11 +1113,11 @@
               <!-- Price & Store Action -->
               <div class="pt-2 mt-2 border-t border-slate-800/80 flex items-center justify-between">
                 <div>
-                  <span class="text-[10px] text-slate-500 uppercase font-semibold block">${c.stock > 0 ? 'Price' : 'Cena kat.'}</span>
-                  <span class="text-base font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} <span class="text-xs font-bold ${c.stock > 0 ? 'text-amber-500' : 'text-slate-500'}">zł</span></span>
+                  <span class="text-[10px] text-slate-500 uppercase font-semibold block">${c.stock > 0 ? 'Price' : 'Catalog Price'}</span>
+                  <span class="text-base font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} <span class="text-xs font-bold ${c.stock > 0 ? 'text-amber-500' : 'text-slate-500'}">PLN</span></span>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
+                  <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Set Discord Alert"
                     class="text-xs px-2 py-1.5 rounded-lg ${c.stock <= 0 ? 'bg-indigo-600 hover:bg-indigo-500 text-white font-bold' : 'bg-slate-800 hover:bg-indigo-600 text-slate-400 hover:text-white'} border border-slate-700 transition flex items-center gap-1 shadow cursor-pointer">
                     <i class="fa-solid fa-bell text-[11px]"></i>
                     ${c.stock <= 0 ? '<span class="text-[10px]">Alert</span>' : ''}
@@ -1129,12 +1125,12 @@
                   ${c.stock > 0 ? `
                     <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
                       class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1 shadow">
-                      Kup <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                      Buy <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
                     </a>
                   ` : `
                     <a href="${c.card_url || 'https://mtgspot.pl'}" target="_blank" rel="noopener noreferrer"
                       class="text-xs px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium border border-slate-700 transition flex items-center gap-1">
-                      Katalog <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                      Catalog <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
                     </a>
                   `}
                 </div>
@@ -1175,11 +1171,11 @@
               ${c.is_foil ? `<span class="text-[10px] font-bold px-1.5 py-0.5 rounded foil-shimmer text-slate-950">Foil</span>` : `<span class="text-slate-600">-</span>`}
             </td>
             <td class="px-4 py-2.5 text-center font-semibold">
-              ${c.stock > 0 ? `<span class="text-emerald-400">${c.stock} szt.</span>` : `<span class="text-rose-400 text-xs font-semibold">Wyprzedana</span>`}
+              ${c.stock > 0 ? `<span class="text-emerald-400">${c.stock} pcs</span>` : `<span class="text-rose-400 text-xs font-semibold">Sold Out</span>`}
             </td>
-            <td class="px-4 py-2.5 text-right font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} zł</td>
+            <td class="px-4 py-2.5 text-right font-black ${c.stock > 0 ? 'text-amber-400' : 'text-slate-400'}">${Number(c.price).toFixed(2)} PLN</td>
             <td class="px-4 py-2.5 text-center flex items-center justify-center gap-2">
-              <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Ustaw powiadomienie Discord"
+              <button onclick="quickWatchCard('${c.title.replace(/'/g, "\\'")}', ${c.price})" title="Set Discord Alert"
                 class="text-slate-400 hover:text-indigo-400 transition cursor-pointer">
                 <i class="fa-solid fa-bell text-xs"></i>
               </button>
@@ -1384,7 +1380,7 @@
 
         const allPill = `
           <button onclick="selectWishlist(null)" class="px-3 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${currentWishlistId === null ? 'bg-indigo-600 text-white shadow shadow-indigo-600/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}">
-            Wszystkie <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] ${currentWishlistId === null ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-400'}">${totalCards}</span>
+            All <span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] ${currentWishlistId === null ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-700 text-slate-400'}">${totalCards}</span>
           </button>
         `;
 
@@ -1404,7 +1400,7 @@
         if (addSelect) {
           const currentVal = addSelect.value;
           addSelect.innerHTML = wishlistsData.map(w => `
-            <option value="${w.id}">${w.name} (${w.card_count || 0} kart)</option>
+            <option value="${w.id}">${w.name} (${w.card_count || 0} cards)</option>
           `).join('');
           if (currentWishlistId) {
             addSelect.value = currentWishlistId;
@@ -1429,17 +1425,17 @@
         const checkBtnLabel = document.getElementById('check-wl-label');
 
         if (currentWishlistId === null) {
-          if (titleEl) titleEl.textContent = 'Wszystkie listy i talie';
-          if (statsEl) statsEl.textContent = `(${totalCards} kart${totalInStock > 0 ? `, 🟢 ${totalInStock} w sklepie` : ''})`;
+          if (titleEl) titleEl.textContent = 'All Wishlists & Decks';
+          if (statsEl) statsEl.textContent = `(${totalCards} cards${totalInStock > 0 ? `, 🟢 ${totalInStock} in store` : ''})`;
           if (manageBtns) manageBtns.classList.add('hidden');
-          if (checkBtnLabel) checkBtnLabel.textContent = 'Sprawdź wszystkie';
+          if (checkBtnLabel) checkBtnLabel.textContent = 'Check All';
         } else {
           const cur = wishlistsData.find(w => w.id === currentWishlistId);
           if (cur) {
             if (titleEl) titleEl.textContent = cur.name;
-            if (statsEl) statsEl.textContent = `(${cur.card_count || 0} kart${(cur.in_stock_count || 0) > 0 ? `, 🟢 ${cur.in_stock_count} w sklepie` : ''})`;
+            if (statsEl) statsEl.textContent = `(${cur.card_count || 0} cards${(cur.in_stock_count || 0) > 0 ? `, 🟢 ${cur.in_stock_count} in store` : ''})`;
             if (manageBtns) manageBtns.classList.remove('hidden');
-            if (checkBtnLabel) checkBtnLabel.textContent = `Sprawdź tę listę`;
+            if (checkBtnLabel) checkBtnLabel.textContent = `Check This List`;
             const delBtn = document.getElementById('btn-del-wishlist');
             if (delBtn) {
               delBtn.style.display = cur.id === 1 ? 'none' : 'inline-block';
@@ -1448,7 +1444,7 @@
         }
 
       } catch (err) {
-        console.error('Błąd pobierania wishlist:', err);
+        console.error('Failed to load wishlists:', err);
       }
     }
 
@@ -1459,7 +1455,7 @@
     }
 
     async function promptCreateWishlist() {
-      const name = prompt('Podaj nazwę nowej wishlisty / talii (np. Rakdos deck, Boros deck, Sideboard):');
+      const name = prompt('Enter new wishlist / deck name (e.g. Rakdos deck, Boros deck, Sideboard):');
       if (!name || !name.trim()) return;
 
       try {
@@ -1474,10 +1470,10 @@
           await loadWishlists();
           await loadWatchlist();
         } else {
-          alert('Błąd: ' + (data.detail || 'Nie udało się utworzyć listy'));
+          alert('Error: ' + (data.detail || 'Failed to create wishlist'));
         }
       } catch (err) {
-        alert('Błąd sieci: ' + err);
+        alert('Network error: ' + err);
       }
     }
 
@@ -1486,7 +1482,7 @@
       const cur = wishlistsData.find(w => w.id === currentWishlistId);
       if (!cur) return;
 
-      const newName = prompt(`Zmień nazwę listy "${cur.name}":`, cur.name);
+      const newName = prompt(`Rename wishlist "${cur.name}":`, cur.name);
       if (!newName || !newName.trim() || newName.trim() === cur.name) return;
 
       try {
@@ -1500,10 +1496,10 @@
           await loadWishlists();
           await loadWatchlist();
         } else {
-          alert('Błąd: ' + (data.detail || 'Nie udało się zaktualizować listy'));
+          alert('Error: ' + (data.detail || 'Failed to update wishlist'));
         }
       } catch (err) {
-        alert('Błąd sieci: ' + err);
+        alert('Network error: ' + err);
       }
     }
 
@@ -1512,7 +1508,7 @@
       const cur = wishlistsData.find(w => w.id === currentWishlistId);
       if (!cur) return;
 
-      if (!confirm(`Czy na pewno chcesz usunąć listę "${cur.name}" wraz ze wszystkimi ${cur.card_count || 0} obserwowanymi w niej kartami?`)) {
+      if (!confirm(`Are you sure you want to delete "${cur.name}" and all its ${cur.card_count || 0} watched cards?`)) {
         return;
       }
 
@@ -1526,10 +1522,10 @@
           await loadWatchlist();
         } else {
           const data = await res.json();
-          alert('Błąd: ' + (data.detail || 'Nie udało się usunąć listy'));
+          alert('Error: ' + (data.detail || 'Failed to delete wishlist'));
         }
       } catch (err) {
-        alert('Błąd sieci: ' + err);
+        alert('Network error: ' + err);
       }
     }
 
@@ -1573,13 +1569,13 @@
         tbody.innerHTML = items.map(it => {
           const isAvailable = (it.last_stock || 0) > 0;
           const statusBadge = isAvailable
-            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">🟢 Dostępna (${it.last_stock} szt.)</span>`
-            : `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">⚪ Oczekiwanie</span>`;
+            ? `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">🟢 In Stock (${it.last_stock} pcs)</span>`
+            : `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">⚪ Waiting</span>`;
 
-          const priceStr = it.max_price ? `${it.max_price.toFixed(2)} zł` : '<span class="text-slate-500">Dowolna</span>';
-          const foilStr = it.is_foil === true ? '✨ Foil' : (it.is_foil === false ? 'Regular' : 'Dowolne');
+          const priceStr = it.max_price ? `${it.max_price.toFixed(2)} PLN` : '<span class="text-slate-500">Any</span>';
+          const foilStr = it.is_foil === true ? '✨ Foil' : (it.is_foil === false ? 'Regular' : 'Any');
           const listColHtml = currentWishlistId === null 
-            ? `<td class="px-2 py-2.5"><span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-semibold whitespace-nowrap">${it.list_name || 'Główna'}</span></td>` 
+            ? `<td class="px-2 py-2.5"><span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[10px] font-semibold whitespace-nowrap">${it.list_name || 'Main Wishlist'}</span></td>` 
             : '';
 
           return `
@@ -1593,10 +1589,10 @@
               <td class="px-2 py-2.5 text-center text-[10px] text-slate-400">${foilStr}</td>
               <td class="px-3 py-2.5 text-center text-[10px]">${statusBadge}</td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap space-x-1">
-                <button onclick="openEditWatchlistItemModal(${it.id})" class="text-slate-400 hover:text-indigo-400 p-1 transition" title="Edytuj alert">
+                <button onclick="openEditWatchlistItemModal(${it.id})" class="text-slate-400 hover:text-indigo-400 p-1 transition" title="Edit alert">
                   <i class="fa-solid fa-pen"></i>
                 </button>
-                <button onclick="deleteWatchlistCard(${it.id})" class="text-rose-400 hover:text-rose-300 p-1 transition" title="Usuń z obserwowanych">
+                <button onclick="deleteWatchlistCard(${it.id})" class="text-rose-400 hover:text-rose-300 p-1 transition" title="Remove from watchlist">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
               </td>
@@ -1605,7 +1601,7 @@
         }).join('');
 
       } catch (err) {
-        console.error('Błąd ładowania listy obserwowanych:', err);
+        console.error('Failed to load watchlist:', err);
       }
     }
 
@@ -1620,7 +1616,7 @@
           document.getElementById('discord-check-interval').value = data.interval_seconds;
         }
       } catch (err) {
-        console.error('Błąd pobierania ustawień Discord:', err);
+        console.error('Failed to load Discord settings:', err);
       }
     }
 
@@ -1631,7 +1627,7 @@
 
       if (!url) {
         alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
-        alertBox.textContent = 'Proszę podać adres Discord Webhook URL.';
+        alertBox.textContent = 'Please enter a valid Discord Webhook URL.';
         alertBox.classList.remove('hidden');
         return;
       }
@@ -1648,7 +1644,7 @@
         alertBox.classList.remove('hidden');
       } catch (err) {
         alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
-        alertBox.textContent = 'Błąd zapisu: ' + err;
+        alertBox.textContent = 'Save error: ' + err;
         alertBox.classList.remove('hidden');
       }
     }
@@ -1660,13 +1656,13 @@
 
       if (!url) {
         alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
-        alertBox.textContent = 'Wklej webhook URL, aby móc go przetestować.';
+        alertBox.textContent = 'Please enter a webhook URL first.';
         alertBox.classList.remove('hidden');
         return;
       }
 
       btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Wysyłanie...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sending...`;
 
       try {
         const res = await fetch('/api/discord/test', {
@@ -1676,22 +1672,22 @@
         });
         const data = await res.json();
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test`;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Send Test Alert`;
 
         if (res.ok) {
           alertBox.className = 'p-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-[11px]';
-          alertBox.textContent = '✅ ' + data.message + ' Sprawdź swój kanał na Discordzie!';
+          alertBox.textContent = '✅ ' + data.message + ' Check your Discord channel!';
           alertBox.classList.remove('hidden');
         } else {
           alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
-          alertBox.textContent = '❌ Błąd: ' + (data.detail || 'Nie udało się wysłać');
+          alertBox.textContent = '❌ Error: ' + (data.detail || 'Failed to send test alert');
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Wyślij test`;
+        btn.innerHTML = `<i class="fa-solid fa-paper-plane text-[11px]"></i> Send Test Alert`;
         alertBox.className = 'p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300 text-[11px]';
-        alertBox.textContent = 'Błąd połączenia: ' + err;
+        alertBox.textContent = 'Connection error: ' + err;
         alertBox.classList.remove('hidden');
       }
     }
@@ -1712,13 +1708,13 @@
         btnBulk.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center';
         wrapSingle.classList.remove('hidden');
         wrapBulk.classList.add('hidden');
-        btnLabel.textContent = 'Dodaj do obserwowanych';
+        btnLabel.textContent = 'Add to Watchlist';
       } else {
         btnBulk.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition text-center';
         btnSingle.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition text-center';
         wrapSingle.classList.add('hidden');
         wrapBulk.classList.remove('hidden');
-        btnLabel.textContent = 'Dodaj listę do obserwowanych';
+        btnLabel.textContent = 'Add Cards to Watchlist';
       }
     }
 
@@ -1769,10 +1765,10 @@
           await loadWatchlist();
         } else {
           const data = await res.json();
-          alert('Błąd: ' + (data.detail || 'Nie udało się zapisać zmian'));
+          alert('Error: ' + (data.detail || 'Failed to save changes'));
         }
       } catch (err) {
-        alert('Błąd zapisu: ' + err);
+        alert('Save error: ' + err);
       }
     }
 
@@ -1788,7 +1784,7 @@
       if (watchlistAddMode === 'single') {
         const name = document.getElementById('add-wl-name').value.trim();
         if (!name) {
-          alert('Podaj nazwę karty!');
+          alert('Please enter a card name!');
           return;
         }
 
@@ -1815,16 +1811,16 @@
               alert(data.message);
             }
           } else {
-            alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+            alert('Error: ' + (data.detail || 'Failed to add card'));
           }
         } catch (err) {
-          alert('Błąd sieci: ' + err);
+          alert('Network error: ' + err);
         }
       } else {
         // Bulk Add
         const text = document.getElementById('add-wl-bulk-text').value.trim();
         if (!text) {
-          alert('Wklej listę kart (jedna pod drugą)!');
+          alert('Please paste a card list (one per line)!');
           return;
         }
 
@@ -1846,12 +1842,12 @@
             document.getElementById('add-wl-bulk-text').value = '';
             currentWishlistId = targetListId;
             switchDiscordTab('watchlist');
-            alert(data.message || `Przetworzono ${data.total_added} kart!`);
+            alert(data.message || `Processed ${data.total_added} cards!`);
           } else {
-            alert('Błąd: ' + (data.detail || 'Nie udało się dodać'));
+            alert('Error: ' + (data.detail || 'Failed to add cards'));
           }
         } catch (err) {
-          alert('Błąd sieci: ' + err);
+          alert('Network error: ' + err);
         }
       }
     }
@@ -1883,13 +1879,13 @@
     async function runBulkSearch() {
       const text = document.getElementById('bulk-search-input').value.trim();
       if (!text) {
-        alert('Wklej najpierw listę kart!');
+        alert('Please paste a card list first!');
         return;
       }
 
       const btn = document.getElementById('btn-run-bulk-search');
       btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sprawdzanie kart...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Checking availability...`;
 
       try {
         const res = await fetch('/api/cards/bulk', {
@@ -1899,10 +1895,10 @@
         });
         const data = await res.json();
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart`;
+        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Check Card Availability`;
 
         if (!res.ok) {
-          alert('Błąd: ' + (data.detail || 'Nie udało się przetworzyć listy'));
+          alert('Error: ' + (data.detail || 'Failed to process card list'));
           return;
         }
 
@@ -1910,8 +1906,8 @@
 
       } catch (err) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Sprawdź dostępność kart`;
-        alert('Błąd zapytania: ' + err);
+        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> Check Card Availability`;
+        alert('Query error: ' + err);
       }
     }
 
@@ -1923,7 +1919,7 @@
       document.getElementById('bulk-stat-total').textContent = s.total_requested;
       document.getElementById('bulk-stat-avail').textContent = s.available_count;
       document.getElementById('bulk-stat-missing').textContent = s.missing_count;
-      document.getElementById('bulk-stat-cost').textContent = `${s.total_estimated_cost.toFixed(2)} zł`;
+      document.getElementById('bulk-stat-cost').textContent = `${s.total_estimated_cost.toFixed(2)} PLN`;
 
       // Missing Action Bar
       lastBulkMissingCards = data.missing.map(m => m.requested_name);
@@ -1934,7 +1930,7 @@
         if (addMissingBtn) {
           addMissingBtn.disabled = false;
           addMissingBtn.className = 'px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow cursor-pointer';
-          addMissingBtn.innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące (${lastBulkMissingCards.length})`;
+          addMissingBtn.innerHTML = `<i class="fa-solid fa-bell"></i> Watch Missing (${lastBulkMissingCards.length})`;
         }
       } else {
         if (missingBar) missingBar.classList.add('hidden');
@@ -1958,7 +1954,7 @@
                 <img src="${offer.image || placeholderImg}" class="w-7 h-10 object-cover rounded bg-slate-950 border border-slate-800" onerror="this.src='${placeholderImg}'">
                 <div>
                   <span class="font-bold text-white block">${item.requested_name}</span>
-                  <span class="text-[10px] text-slate-500">${item.quantity > 1 ? `${item.quantity}x w talii` : '1x'}</span>
+                  <span class="text-[10px] text-slate-500">${item.quantity > 1 ? `${item.quantity}x in deck` : '1x'}</span>
                 </div>
               </td>
               <td class="px-3 py-2 text-slate-300">${offer.expansion_name || 'Standard'}</td>
@@ -1966,16 +1962,16 @@
                 <span class="px-1.5 py-0.5 rounded border text-[10px] font-bold ${condClass}">${offer.condition || 'NM'}</span>
               </td>
               <td class="px-3 py-2 text-center font-semibold text-slate-200">
-                ${item.total_stock} szt.
+                ${item.total_stock} pcs
               </td>
               <td class="px-3 py-2 text-right">
-                <span class="font-black text-amber-400 block">${item.cheapest_price.toFixed(2)} zł</span>
-                ${item.quantity > 1 ? `<span class="text-[10px] text-slate-500">Razem: ${item.subtotal_price.toFixed(2)} zł</span>` : ''}
+                <span class="font-black text-amber-400 block">${item.cheapest_price.toFixed(2)} PLN</span>
+                ${item.quantity > 1 ? `<span class="text-[10px] text-slate-500">Total: ${item.subtotal_price.toFixed(2)} PLN</span>` : ''}
               </td>
               <td class="px-3 py-2 text-center">
                 <a href="${offer.card_url || 'https://mtgspot.pl'}" target="_blank"
                   class="text-xs px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition inline-flex items-center gap-1 shadow">
-                  Kup <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                  Buy <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
                 </a>
               </td>
             </tr>
@@ -1992,7 +1988,7 @@
         missingWrap.classList.remove('hidden');
         missingList.innerHTML = data.missing.map(m => {
           const cat = m.catalog_offer;
-          const infoText = cat ? `${cat.expansion_name || ''}${cat.price ? ' · kat. ~' + Number(cat.price).toFixed(2) + ' zł' : ''}` : '';
+          const infoText = cat ? `${cat.expansion_name || ''}${cat.price ? ' · catalog ~' + Number(cat.price).toFixed(2) + ' PLN' : ''}` : '';
           return `
             <div class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-slate-300 flex items-center justify-between gap-2 text-xs">
               <div class="flex items-center gap-2">
@@ -2003,8 +1999,8 @@
                 </div>
               </div>
               <div class="flex items-center gap-1.5">
-                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold whitespace-nowrap">Wyprzedana (0 szt.)</span>
-                <button onclick="quickWatchCard('${m.requested_name.replace(/'/g, "\\'")}', ${cat && cat.price ? cat.price : 0})" title="Dodaj tę kartę do obserwowanych"
+                <span class="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold whitespace-nowrap">Sold Out (0 pcs)</span>
+                <button onclick="quickWatchCard('${m.requested_name.replace(/'/g, "\\'")}', ${cat && cat.price ? cat.price : 0})" title="Add this card to watchlist"
                   class="text-[11px] px-2 py-1 rounded bg-slate-700 hover:bg-indigo-600 text-slate-200 hover:text-white transition flex items-center gap-1 cursor-pointer">
                   <i class="fa-solid fa-bell text-[10px]"></i> Alert
                 </button>
@@ -2021,14 +2017,14 @@
       let targetListId = currentWishlistId || 1;
       if (!currentWishlistId && wishlistsData.length > 1) {
         const optionsText = wishlistsData.map(w => `${w.id}: ${w.name}`).join('\n');
-        const chosen = prompt(`Do której wishlisty/talii chcesz dodać brakujące karty?\nWpisz numer ID:\n${optionsText}`, "1");
+        const chosen = prompt(`Which wishlist / deck would you like to add missing cards to?\nEnter list ID:\n${optionsText}`, "1");
         if (!chosen) return;
         targetListId = parseInt(chosen, 10) || 1;
       }
 
       const btn = document.getElementById('btn-add-missing-wl');
       btn.disabled = true;
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Dodawanie...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Adding...`;
 
       try {
         const res = await fetch('/api/watchlist/bulk', {
@@ -2038,9 +2034,9 @@
         });
         const data = await res.json();
         if (data.total_added === 0 && data.total_existing > 0) {
-          btn.innerHTML = `<i class="fa-solid fa-check"></i> Karty są już na liście!`;
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Cards are already on list!`;
         } else {
-          btn.innerHTML = `<i class="fa-solid fa-check"></i> Dodano ${data.total_added} kart!`;
+          btn.innerHTML = `<i class="fa-solid fa-check"></i> Added ${data.total_added} cards!`;
         }
         btn.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold transition flex items-center gap-1.5 text-xs whitespace-nowrap shadow';
         currentWishlistId = targetListId;
@@ -2048,8 +2044,8 @@
         await loadWatchlist();
       } catch (err) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="fa-solid fa-bell"></i> Obserwuj brakujące`;
-        alert('Błąd dodawania: ' + err);
+        btn.innerHTML = `<i class="fa-solid fa-bell"></i> Watch Missing`;
+        alert('Failed to add cards: ' + err);
       }
     }
 
@@ -2068,13 +2064,13 @@
     }
 
     async function deleteWatchlistCard(id) {
-      if (!confirm('Czy na pewno chcesz usunąć tę kartę z obserwowanych?')) return;
+      if (!confirm('Are you sure you want to remove this card from your watchlist?')) return;
       try {
         await fetch(`/api/watchlist/${id}`, { method: 'DELETE' });
         await loadWishlists();
         await loadWatchlist();
       } catch (err) {
-        alert('Błąd usuwania: ' + err);
+        alert('Failed to delete card: ' + err);
       }
     }
 
@@ -2092,11 +2088,11 @@
         btn.disabled = false;
         await loadWishlists();
         await loadWatchlist();
-        alert(`Sprawdzono ${data.checked_count} kart. Wysłano ${data.alerts_sent} powiadomień Discord!`);
+        alert(`Checked ${data.checked_count} cards. Sent ${data.alerts_sent} Discord alerts!`);
       } catch (err) {
         icon.classList.remove('fa-spin');
         btn.disabled = false;
-        alert('Błąd sprawdzania: ' + err);
+        alert('Check error: ' + err);
       }
     }
   </script>

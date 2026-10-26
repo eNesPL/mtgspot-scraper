@@ -321,7 +321,7 @@ def bulk_search_cards(req: BulkSearchRequest):
                 card_entries.append((1, c.strip()))
 
     if not card_entries:
-        raise HTTPException(status_code=400, detail="Nie podano żadnych kart do wyszukania")
+        raise HTTPException(status_code=400, detail="No cards provided for search")
 
     # Limit to 100 cards per request
     card_entries = card_entries[:100]
@@ -479,7 +479,7 @@ def get_wishlists():
 @app.post("/api/wishlists", summary="Create a new wishlist / decklist")
 def create_wishlist(req: WishlistCreateRequest):
     if not req.name or not req.name.strip():
-        raise HTTPException(status_code=400, detail="Nazwa wishlisty jest wymagana")
+        raise HTTPException(status_code=400, detail="Wishlist name is required")
     try:
         list_id = db.create_wishlist(
             name=req.name,
@@ -488,12 +488,12 @@ def create_wishlist(req: WishlistCreateRequest):
         )
         return {
             "status": "success",
-            "message": f"Utworzono listę '{req.name.strip()}'!",
+            "message": f"Created wishlist '{req.name.strip()}'!",
             "list": db.get_wishlist(list_id)
         }
     except Exception as e:
         if "UNIQUE" in str(e).upper():
-            raise HTTPException(status_code=400, detail="Lista o takiej nazwie już istnieje")
+            raise HTTPException(status_code=400, detail="A wishlist with this name already exists")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -507,10 +507,10 @@ def update_wishlist(list_id: int, req: WishlistUpdateRequest):
         is_active=req.is_active
     )
     if not success:
-        raise HTTPException(status_code=404, detail="Lista nie została znaleziona lub brak zmian")
+        raise HTTPException(status_code=404, detail="Wishlist not found or no changes made")
     return {
         "status": "success",
-        "message": "Zaktualizowano listę",
+        "message": "Wishlist updated successfully",
         "list": db.get_wishlist(list_id)
     }
 
@@ -520,8 +520,8 @@ def delete_wishlist(list_id: int):
     try:
         success = db.delete_wishlist(list_id)
         if not success:
-            raise HTTPException(status_code=404, detail="Lista nie została znaleziona")
-        return {"status": "success", "message": "Usunięto listę wraz z jej kartami"}
+            raise HTTPException(status_code=404, detail="Wishlist not found")
+        return {"status": "success", "message": "Wishlist and its cards deleted successfully"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -536,7 +536,7 @@ def get_watchlist(list_id: Optional[int] = None):
 @app.post("/api/watchlist", summary="Add card to Discord alert watchlist")
 def add_to_watchlist(req: WatchlistCreateRequest):
     if not req.card_name or not req.card_name.strip():
-        raise HTTPException(status_code=400, detail="Nazwa karty jest wymagana")
+        raise HTTPException(status_code=400, detail="Card name is required")
 
     target_list_id = req.list_id or 1
     item_id, is_new = db.add_or_update_watchlist_item(
@@ -554,11 +554,11 @@ def add_to_watchlist(req: WatchlistCreateRequest):
     default_webhook = db.get_setting("discord_webhook")
     check_result = watcher.check_watchlist_item(item, default_webhook)
 
-    list_name = item.get("list_name", "Główna lista") if item else "Główna lista"
+    list_name = item.get("list_name", "Main Wishlist") if item else "Main Wishlist"
     message = (
-        f"Karta '{req.card_name}' została dodana do listy '{list_name}'!"
+        f"Card '{req.card_name}' was added to '{list_name}'!"
         if is_new else
-        f"Karta '{req.card_name}' już znajdowała się na liście '{list_name}' (zaktualizowano parametry)!"
+        f"Card '{req.card_name}' was already on '{list_name}' (rules updated)!"
     )
 
     return {
@@ -583,10 +583,10 @@ def update_watchlist_item(item_id: int, req: WatchlistUpdateRequest):
         is_active=req.is_active
     )
     if not success:
-        raise HTTPException(status_code=404, detail="Element nie został znaleziony lub brak zmian")
+        raise HTTPException(status_code=404, detail="Watchlist item not found or no changes made")
     return {
         "status": "success",
-        "message": "Zaktualizowano reguły alertu",
+        "message": "Alert rules updated successfully",
         "item": db.get_watchlist_item(item_id)
     }
 
@@ -605,7 +605,7 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
                 card_entries.append((1, c.strip()))
 
     if not card_entries:
-        raise HTTPException(status_code=400, detail="Nie podano żadnych kart do dodania")
+        raise HTTPException(status_code=400, detail="No cards provided to add")
 
     # Limit to 200 cards
     card_entries = card_entries[:200]
@@ -639,11 +639,11 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
     list_name = list_obj["name"] if list_obj else f"ID {target_list_id}"
 
     if inserted_ids and existing_ids:
-        msg = f"Dodano {len(inserted_ids)} nowych kart do '{list_name}' ({len(existing_ids)} było już na liście)."
+        msg = f"Added {len(inserted_ids)} new cards to '{list_name}' ({len(existing_ids)} were already on the list)."
     elif existing_ids:
-        msg = f"Wszystkie podane karty ({len(existing_ids)}) znajdowały się już na liście '{list_name}'!"
+        msg = f"All provided cards ({len(existing_ids)}) were already on '{list_name}'!"
     else:
-        msg = f"Dodano {len(inserted_ids)} kart do listy '{list_name}'!"
+        msg = f"Added {len(inserted_ids)} cards to '{list_name}'!"
 
     return {
         "status": "success",
@@ -660,8 +660,8 @@ def add_to_watchlist_bulk(req: BulkWatchlistRequest):
 def delete_from_watchlist(item_id: int):
     success = db.delete_watchlist_item(item_id)
     if not success:
-        raise HTTPException(status_code=404, detail="Element listy nie został znaleziony")
-    return {"status": "success", "message": "Usunięto z listy obserwowanych"}
+        raise HTTPException(status_code=404, detail="Watchlist item not found")
+    return {"status": "success", "message": "Removed from watchlist"}
 
 
 @app.post("/api/watchlist/check", summary="Manually trigger immediate stock check (all or specific list)")
@@ -694,7 +694,7 @@ def save_discord_settings(req: DiscordSettingsRequest):
     db.set_setting("discord_webhook", req.webhook_url.strip())
     if req.interval_seconds:
         db.set_setting("watch_interval_seconds", str(max(60, req.interval_seconds)))
-    return {"status": "success", "message": "Ustawienia Discord zostały zapisane!"}
+    return {"status": "success", "message": "Discord settings saved successfully!"}
 
 
 @app.post("/api/discord/test", summary="Send test message to Discord Webhook")
