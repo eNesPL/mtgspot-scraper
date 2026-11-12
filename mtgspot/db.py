@@ -807,7 +807,18 @@ class Database:
             SELECT 
                 wl.*,
                 COALESCE(w.name, 'Main Wishlist') as list_name,
-                w.webhook_url as list_webhook_url
+                w.webhook_url as list_webhook_url,
+                (
+                    SELECT c.card_url
+                    FROM cards c
+                    WHERE LOWER(TRIM(c.title)) = LOWER(TRIM(wl.card_name))
+                      AND (wl.expansion IS NULL OR wl.expansion = ''
+                           OR LOWER(COALESCE(c.expansion_name, '')) LIKE '%' || LOWER(wl.expansion) || '%')
+                      AND c.card_url IS NOT NULL
+                      AND c.card_url != ''
+                    ORDER BY c.stock DESC, c.price ASC
+                    LIMIT 1
+                ) AS card_url
             FROM watchlist wl
             LEFT JOIN wishlists w ON wl.list_id = w.id
             WHERE 1=1
@@ -835,7 +846,18 @@ class Database:
                 SELECT 
                     wl.*,
                     COALESCE(w.name, 'Main Wishlist') as list_name,
-                    w.webhook_url as list_webhook_url
+                    w.webhook_url as list_webhook_url,
+                (
+                    SELECT c.card_url
+                    FROM cards c
+                    WHERE LOWER(TRIM(c.title)) = LOWER(TRIM(wl.card_name))
+                      AND (wl.expansion IS NULL OR wl.expansion = ''
+                           OR LOWER(COALESCE(c.expansion_name, '')) LIKE '%' || LOWER(wl.expansion) || '%')
+                      AND c.card_url IS NOT NULL
+                      AND c.card_url != ''
+                    ORDER BY c.stock DESC, c.price ASC
+                    LIMIT 1
+                ) AS card_url
                 FROM watchlist wl
                 LEFT JOIN wishlists w ON wl.list_id = w.id
                 WHERE wl.id = ?
