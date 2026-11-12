@@ -1553,6 +1553,20 @@
       }
     }
 
+    function getWatchlistStoreLink(cardUrl) {
+      if (!cardUrl) return '';
+      try {
+        const url = new URL(cardUrl);
+        if (url.protocol !== 'https:' || !['mtgspot.pl', 'www.mtgspot.pl'].includes(url.hostname)) return '';
+        const safeUrl = url.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-amber-400 hover:text-amber-300 p-1 transition" title="Open card in MTG Spot store" aria-label="Open card in MTG Spot store">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>`;
+      } catch (err) {
+        return '';
+      }
+    }
+
     async function loadWatchlist() {
       try {
         const url = currentWishlistId ? `/api/watchlist?list_id=${currentWishlistId}` : '/api/watchlist';
@@ -1613,6 +1627,7 @@
               <td class="px-2 py-2.5 text-center text-[10px] text-slate-400">${foilStr}</td>
               <td class="px-3 py-2.5 text-center text-[10px]">${statusBadge}</td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap space-x-1">
+                ${getWatchlistStoreLink(it.card_url)}
                 <button onclick="openEditWatchlistItemModal(${it.id})" class="text-slate-400 hover:text-indigo-400 p-1 transition" title="Edit alert">
                   <i class="fa-solid fa-pen"></i>
                 </button>
