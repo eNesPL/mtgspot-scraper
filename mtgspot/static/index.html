@@ -1054,6 +1054,30 @@
       }
     }
 
+    function openCardStore(event, cardElement) {
+      // Keep dedicated controls (Buy, Alert, links) working independently.
+      if (event.target.closest('button, a, input, select, textarea, label')) return;
+
+      if (event.type === 'keydown') {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+      }
+
+      const rawUrl = cardElement.dataset.cardUrl;
+      if (!rawUrl) return;
+
+      try {
+        const url = new URL(rawUrl, window.location.origin);
+        if (url.protocol !== 'https:' || !['mtgspot.pl', 'www.mtgspot.pl'].includes(url.hostname)) {
+          console.warn('Blocked unexpected card store URL:', rawUrl);
+          return;
+        }
+        window.open(url.href, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        console.error('Invalid card store URL:', rawUrl, err);
+      }
+    }
+
     function renderGrid(cards) {
       const container = document.getElementById('cards-grid');
       container.innerHTML = cards.map(c => {
@@ -1063,7 +1087,7 @@
         const imgUrl = c.image || placeholderImg;
 
         return `
-          <div class="group bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 relative overflow-hidden">
+          <div role="link" tabindex="0" aria-label="Open ${c.title} in MTG Spot store" data-card-url="${String(c.card_url || 'https://mtgspot.pl').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" onclick="openCardStore(event, this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') openCardStore(event, this)" class="group cursor-pointer bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:shadow-amber-500/5 relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-amber-500">
             
             ${c.is_foil ? `<div class="absolute -top-10 -right-10 w-24 h-24 foil-shimmer rounded-full opacity-30 pointer-events-none"></div>` : ''}
 
@@ -1150,7 +1174,7 @@
         const placeholderImg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 56' fill='%231e293b'%3E%3Crect width='40' height='56' rx='4'/%3E%3C/svg%3E";
 
         return `
-          <tr class="hover:bg-slate-800/40 transition">
+          <tr role="link" tabindex="0" data-card-url="${String(c.card_url || 'https://mtgspot.pl').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" onclick="openCardStore(event, this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') openCardStore(event, this)" class="cursor-pointer hover:bg-slate-800/40 transition focus:outline-none focus:bg-slate-800/60">
             <td class="px-4 py-2.5 flex items-center gap-3">
               <img src="${c.image || placeholderImg}" class="w-8 h-11 object-cover rounded bg-slate-950 border border-slate-800" onerror="this.src='${placeholderImg}'">
               <div>
