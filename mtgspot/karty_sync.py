@@ -779,6 +779,7 @@ class KartySyncService:
         # Parse and match each article; if parsing fails on malformed item, abort scan_succeeded!
         matched_offers: List[Dict[str, Any]] = []
         seen_external_ids: Set[str] = set()
+        parsed_cards_list: List[Dict[str, Any]] = []
         now_iso = datetime.now(timezone.utc).isoformat()
 
         try:
@@ -788,6 +789,7 @@ class KartySyncService:
 
                 parsed_card = self.scraper.parse_card_item(raw_item)
                 parsed_card["scraped_at"] = now_iso
+                parsed_cards_list.append(parsed_card)
 
                 matched = match_offer_to_buylist_item(
                     parsed_card,
@@ -800,6 +802,41 @@ class KartySyncService:
                     if ext_id not in seen_external_ids:
                         seen_external_ids.add(ext_id)
                         matched_offers.append(matched)
+
+            # Fallback: if Scryfall populated default set/collector_number on the buylist item
+            # and MTGSpot only has other printings/expansions of this card in stock, include them
+            # with requires_verification=True so the admin sees all available printings.
+            if not matched_offers and parsed_cards_list and not wantlist_item.get("strict_expansion"):
+                relaxed_item = dict(wantlist_item)
+                orig_exp = (
+                    wantlist_item.get("set_name")
+                    or wantlist_item.get("expansion")
+                    or (wantlist_item.get("set_code") or "").upper()
+                )
+                relaxed_item["set_code"] = None
+                relaxed_item["set_name"] = None
+                relaxed_item["expansion"] = None
+                relaxed_item["collector_number"] = None
+                relaxed_item["scryfall_id"] = None
+
+                for parsed_card in parsed_cards_list:
+                    matched_relaxed = match_offer_to_buylist_item(
+                        parsed_card,
+                        relaxed_item,
+                        expansion_code_map=expansion_code_map,
+                        expansion_name_to_code=expansion_name_to_code,
+                    )
+                    if matched_relaxed is not None:
+                        ext_id = matched_relaxed["external_id"]
+                        if ext_id not in seen_external_ids:
+                            seen_external_ids.add(ext_id)
+                            offer_exp = parsed_card.get("expansion_name") or "nieznany dodatek"
+                            matched_relaxed["requires_verification"] = True
+                            matched_relaxed["verification_note"] = (
+                                f"Inne wydanie na MTGSpot: {offer_exp}"
+                                + (f" (w buyliście: {orig_exp})" if orig_exp else "")
+                            )
+                            matched_offers.append(matched_relaxed)
         except Exception as parse_err:
             return False, [], f"Parser error while processing '{card_name}': {parse_err}"
 
@@ -813,12 +850,18 @@ class KartySyncService:
         items_checked: int,
         errors_count: int,
         last_error: Optional[str] = None,
+        sync_completed: Optional[bool] = None,
     ) -> Dict[str, Any]:
         status_hint = "ok" if errors_count == 0 else ("partial" if synced_buylist_item_ids else "error")
+        completed_flag = (
+            sync_completed
+            if sync_completed is not None
+            else (len(synced_buylist_item_ids) > 0 and status_hint != "error")
+        )
         payload = {
             "offers": offers,
             "synced_buylist_item_ids": synced_buylist_item_ids,
-            "sync_completed": len(synced_buylist_item_ids) > 0 and status_hint != "error",
+            "sync_completed": completed_flag,
             "sync_meta": {
                 "status": status_hint,
                 "items_checked": items_checked,
@@ -856,6 +899,9 @@ class KartySyncService:
             return {
                 "status": "already_running",
                 "message": "Synchronization is already in progress.",
+                "wantlist_fetched": self.last_items_fetched,
+                "items_checked": self.last_items_checked,
+                "offers_found": self.last_offers_found,
             }
 
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -865,6 +911,8 @@ class KartySyncService:
         try:
             wantlist = self.fetch_wantlist()
             self.last_items_fetched = len(wantlist)
+            self.last_items_checked = 0
+            self.last_offers_found = 0
 
             expansion_code_map, expansion_name_to_code = self._load_expansion_maps()
 
@@ -893,6 +941,26 @@ class KartySyncService:
                         safe_err,
                     )
                     errors.append(safe_err)
+
+                self.last_items_checked = items_checked
+                self.last_offers_found = len(all_matched_offers)
+
+                # Send incremental progress every 10 items on larger buylists so Karty UI updates live
+                if len(wantlist) > 10 and items_checked < len(wantlist) and items_checked % 10 == 0:
+                    try:
+                        self.send_offers_to_karty(
+                            offers=all_matched_offers,
+                            synced_buylist_item_ids=synced_item_ids,
+                            items_checked=items_checked,
+                            errors_count=len(errors),
+                            last_error=errors[0] if errors else None,
+                            sync_completed=False,
+                        )
+                    except Exception as inc_exc:
+                        logger.warning(
+                            "Incremental progress update to Karty failed: %s",
+                            redact_secrets(str(inc_exc), self.config.sync_token),
+                        )
 
             last_err_msg = errors[0] if errors else None
             post_result = self.send_offers_to_karty(
