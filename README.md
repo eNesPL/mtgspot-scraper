@@ -301,9 +301,40 @@ Direct proxy to MTG Spot's gateway API for immediate live results.
 
 ---
 
+### 7. Karty Buylist Integration (`eNesPL/karty`)
+
+`mtgspot-scraper` includes a dedicated, isolated background synchronization service (`mtgspot/karty_sync.py`) that periodically fetches the active buylist from `eNesPL/karty`, searches MTGSpot for all matching in-stock offers, and pushes matched offers back to `karty`.
+
+- **Complete Isolation**: Does not modify or overwrite local manual `wishlists` / `watchlist` tables and never triggers Discord webhook notifications for `karty` buylist items.
+- **Monitoring Only**: Never performs automatic purchases, cart additions, or reservations on MTGSpot.
+- **Safe Availability Tracking**: A buylist item is included in `synced_buylist_item_ids` only when the MTGSpot query and parsing for that item succeed without errors. Network timeouts, HTTP 5xx/429 errors, or malformed responses never cause previously saved offers in `karty` to be marked unavailable.
+
+#### Environment Variables
+| Variable | Default | Description |
+|---|---|---|
+| `KARTY_API_URL` | *(empty)* | Base URL of the `karty` application (e.g., `https://twojadomena.pl` or `http://localhost:3000`) |
+| `KARTY_SYNC_TOKEN` | *(empty)* | Shared Bearer secret matching `MTGSPOT_SYNC_TOKEN` in `karty` (min. 8 characters) |
+| `MTGSPOT_KARTY_SYNC_INTERVAL_SECONDS` | `300` | Background synchronization interval in seconds (5 minutes) |
+
+#### Endpoints (Protected by `Authorization: Bearer <KARTY_SYNC_TOKEN>`)
+- `GET /api/integrations/karty/status` — Returns current synchronization status, last attempt/success timestamps, counters, and last error.
+- `POST /api/integrations/karty/sync` — Triggers an immediate synchronization cycle.
+
+#### CLI Usage
+```bash
+# Run a single synchronization cycle and print JSON report
+python3 cli.py karty-sync --once
+
+# Run continuous synchronization loop
+python3 cli.py karty-sync --interval 300
+```
+
+---
+
 ## 🧪 Testing
 
 Run test suite:
 ```bash
-python3 -m unittest discover tests
+python3 -m unittest discover -s tests -v
 ```
+

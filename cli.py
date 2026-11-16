@@ -4,6 +4,7 @@ MTG Spot Cards Scraper, Search & API CLI
 """
 
 import sys
+import time
 import argparse
 import json
 import logging
@@ -11,6 +12,7 @@ from mtgspot.db import Database, DEFAULT_DB_PATH
 from mtgspot.scraper import MTGSpotScraper, parse_card_list_text
 from mtgspot.discord import send_test_webhook
 from mtgspot.watcher import WatchService
+from mtgspot.karty_sync import KartySyncService, KartySyncConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
@@ -316,6 +318,41 @@ def cmd_watch(args):
         print("\n[!] Monitor zatrzymany przez użytkownika.")
 
 
+def cmd_karty_sync(args):
+    db = Database(args.db)
+    scraper = MTGSpotScraper(db=db)
+    cfg = KartySyncConfig.from_env()
+    if args.interval:
+        cfg.interval_seconds = max(1, int(args.interval))
+    service = KartySyncService(db=db, scraper=scraper, config=cfg)
+
+    if not cfg.enabled:
+        print("[!] Integracja Karty jest wyłączona. Skonfiguruj KARTY_API_URL oraz KARTY_SYNC_TOKEN.")
+        sys.exit(1)
+
+    if args.once:
+        print(f"[*] Uruchamianie jednorazowej synchronizacji z Karty ({cfg.api_url})...")
+        result = service.run_sync_once()
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        if result.get("status") == "error":
+            sys.exit(1)
+        return
+
+    print(f"[*] Uruchamianie pętli synchronizacji Karty <-> MTGSpot (interwał: {cfg.interval_seconds}s)...")
+    print("[*] Naciśnij CTRL+C, aby zatrzymać.\n")
+    try:
+        while True:
+            t_now = time.strftime("%H:%M:%S")
+            res = service.run_sync_once()
+            print(
+                f"[{t_now}] Status: {res.get('status')} | Wantlist: {res.get('wantlist_fetched', 0)} "
+                f"| Oferty: {res.get('offers_found', 0)} | Błędy: {res.get('errors_count', 0)}"
+            )
+            time.sleep(cfg.interval_seconds)
+    except KeyboardInterrupt:
+        print("\n[!] Synchronizacja Karty zatrzymana przez użytkownika.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="MTG Spot Scraper and Search Tool")
     parser.add_argument("--db", default=DEFAULT_DB_PATH, help=f"Path to SQLite DB (default: {DEFAULT_DB_PATH})")
@@ -388,6 +425,11 @@ def main():
     watch_parser = subparsers.add_parser("watch", help="Run continuous background monitor for MTG Spot -> Discord")
     watch_parser.add_argument("--interval", type=int, default=300, help="Check interval in seconds (default: 300)")
 
+    # Karty buylist sync command
+    karty_parser = subparsers.add_parser("karty-sync", help="Synchronize Karty buylist wantlist with MTGSpot offers")
+    karty_parser.add_argument("--once", action="store_true", help="Run a single synchronization cycle and exit")
+    karty_parser.add_argument("--interval", type=int, default=None, help="Override check interval in seconds (default: 300)")
+
     args = parser.parse_args()
 
     if args.command == "scrape":
@@ -406,7 +448,10 @@ def main():
         cmd_watch(args)
     elif args.command == "bulk":
         cmd_bulk(args)
+    elif args.command == "karty-sync":
+        cmd_karty_sync(args)
 
 
 if __name__ == "__main__":
     main()
+

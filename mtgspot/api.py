@@ -5,7 +5,7 @@ import urllib.parse
 import threading
 import logging
 from typing import Optional, List, Tuple, Dict, Any
-from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks, Header
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from .db import Database, DEFAULT_DB_PATH
 from .scraper import MTGSpotScraper, parse_card_list_text
 from .watcher import WatchService
 from .discord import send_test_webhook
+from .karty_sync import KartySyncService, KartySyncConfig
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("mtgspot.api")
@@ -39,17 +40,21 @@ app.add_middleware(
 db = Database()
 scraper = MTGSpotScraper(db=db)
 watcher = WatchService(db=db, scraper=scraper)
+karty_sync = KartySyncService(db=db, scraper=scraper)
 
 
 @app.on_event("startup")
 def on_startup():
     # Start the Discord Watcher background monitoring thread
     watcher.start()
+    # Start the Karty Buylist Sync background thread (if configured)
+    karty_sync.start()
 
 
 @app.on_event("shutdown")
 def on_shutdown():
     watcher.stop()
+    karty_sync.stop()
 
 # Global scrape job state
 scrape_state = {
@@ -705,6 +710,46 @@ def test_discord_webhook(req: DiscordTestRequest):
     return {"status": "success", "message": message}
 
 
+# ==================== Karty Buylist Integration Endpoints ====================
+
+def _verify_karty_integration_auth(authorization: Optional[str]) -> None:
+    if not karty_sync.config.sync_token:
+        raise HTTPException(
+            status_code=503,
+            detail="Karty integration is not configured (missing KARTY_SYNC_TOKEN)",
+        )
+    if not authorization or not authorization.strip():
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization: Bearer token",
+        )
+    if not re.match(r"^Bearer\s+.+$", authorization.strip(), flags=re.IGNORECASE):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Authorization header format (expected Bearer token)",
+        )
+    if not karty_sync.verify_request_token(authorization):
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid integration synchronization token",
+        )
+
+
+@app.get("/api/integrations/karty/status", summary="Get Karty buylist synchronization status")
+def get_karty_integration_status(authorization: Optional[str] = Header(default=None)):
+    _verify_karty_integration_auth(authorization)
+    return karty_sync.get_status()
+
+
+@app.post("/api/integrations/karty/sync", summary="Trigger an immediate Karty buylist synchronization cycle")
+def trigger_karty_integration_sync(authorization: Optional[str] = Header(default=None)):
+    _verify_karty_integration_auth(authorization)
+    result = karty_sync.run_sync_once()
+    if result.get("status") == "error":
+        raise HTTPException(status_code=502, detail=result)
+    return result
+
+
 @app.get("/", response_class=HTMLResponse, summary="Web Dashboard UI")
 def serve_ui():
     static_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
@@ -712,3 +757,4 @@ def serve_ui():
         with open(static_file, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
     return HTMLResponse("<h1>MTG Spot Scraper & Search API is running. UI file missing.</h1>")
+

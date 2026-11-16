@@ -9,9 +9,13 @@ services:
     environment:
       - MTGSPOT_DB_PATH=/data/mtgspot.db
       - PYTHONUNBUFFERED=1
+      - KARTY_API_URL=${KARTY_API_URL:-}
+      - KARTY_SYNC_TOKEN=${KARTY_SYNC_TOKEN:-}
+      - MTGSPOT_KARTY_SYNC_INTERVAL_SECONDS=${MTGSPOT_KARTY_SYNC_INTERVAL_SECONDS:-300}
     volumes:
       - mtgspot-data:/data
 
 volumes:
   mtgspot-data:
     driver: local
+
